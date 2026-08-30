@@ -2,6 +2,8 @@ using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using PapaPersonas.Core.Activity;
+using PapaPersonas.Core.Import;
+using PapaPersonas.Infrastructure.Database;
 
 namespace PapaPersonas.App.Controls;
 
@@ -48,9 +50,15 @@ public partial class ActivityConsoleControl : System.Windows.Controls.UserContro
         {
             System.Windows.Clipboard.SetText(ConsoleTextBox.Text);
         }
-        catch
+        catch (Exception ex) when (!DatabaseExceptionPolicy.IsFatal(ex))
         {
-            // Clipboard access can fail due to OS contention; ignore to keep UI flow stable.
+            System.Windows.MessageBox.Show(
+                UserFacingExceptionMessage.WithTechnicalDetail(
+                    "No se pudo copiar la actividad al portapapeles. Volvé a intentar.",
+                    ex),
+                "Error al copiar",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
         }
     }
 
