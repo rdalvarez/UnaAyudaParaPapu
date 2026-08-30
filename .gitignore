@@ -1,0 +1,42 @@
+# Build artifacts
+bin/
+obj/
+
+# User-specific files
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+
+# IDE
+.vs/
+.vscode/
+.atl/
+
+# Test artifacts
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+
+# Rider / ReSharper
+_ReSharper*/
+*.DotSettings.user
+
+# Generated local runtime folders
+data/
+logs/
+backups/
+outputs/
+*.bak
+*.duckdb
+*.duckdb.wal
+
+# Allow explicit fixtures later, if intentionally added
+!**/fixtures/**/*.duckdb

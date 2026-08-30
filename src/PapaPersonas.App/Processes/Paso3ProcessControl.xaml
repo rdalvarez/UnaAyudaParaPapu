@@ -1,0 +1,153 @@
+<UserControl x:Class="PapaPersonas.App.Processes.Paso3ProcessControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:controls="clr-namespace:PapaPersonas.App.Controls"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="760"
+             d:DesignWidth="1000">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="6" />
+            <RowDefinition Height="110" MinHeight="100" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid Margin="0,0,6,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFFDFDFD">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="Proceso 3 V1 - Consulta y exportación guiadas" />
+                        <TextBlock Margin="0,4,0,0" TextWrapping="Wrap"
+                                   Text="Sólo filtros simples. No hay editor SQL libre. Para análisis avanzados usá DBeaver con los flujos de consulta autorizados." />
+                    </StackPanel>
+                </Border>
+
+                <Grid Grid.Row="1" Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="190" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="170" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="CUIL exacto" />
+                    <TextBox x:Name="ExactCuilTextBox" Grid.Column="1" Margin="8,4" MaxLength="20" />
+                    <Button x:Name="RunQueryButton" Grid.Column="2" Margin="8,4" Width="150" Content="Ejecutar vista previa" Click="RunQuery_Click" />
+                </Grid>
+
+                <Grid Grid.Row="2" Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="190" />
+                        <ColumnDefinition Width="160" />
+                        <ColumnDefinition Width="30" />
+                        <ColumnDefinition Width="160" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="Rango de fechas de importación" />
+                    <TextBox x:Name="ImportDateFromTextBox" Grid.Column="1" Margin="8,4" ToolTip="yyyy-MM-dd" />
+                    <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Center" Text="-" />
+                    <TextBox x:Name="ImportDateToTextBox" Grid.Column="3" Margin="8,4" ToolTip="yyyy-MM-dd" />
+                </Grid>
+
+                <Border Grid.Row="3" Margin="0,10,0,0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFF9F9F9">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="Filtros AND" />
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="220" />
+                                <ColumnDefinition Width="160" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="140" />
+                            </Grid.ColumnDefinitions>
+
+                            <ComboBox x:Name="FilterColumnCombo" Grid.Column="0" Margin="0,0,8,0" />
+                            <ComboBox x:Name="FilterOperatorCombo" Grid.Column="1" Margin="0,0,8,0" />
+                            <TextBox x:Name="FilterValueTextBox" Grid.Column="2" Margin="0,0,8,0" />
+                            <Button x:Name="AddFilterButton" Grid.Column="3" Content="Agregar filtro" Click="AddFilter_Click" />
+                        </Grid>
+
+                        <ListBox x:Name="ActiveFiltersListBox" Margin="0,8,0,0" MinHeight="72" MaxHeight="120" />
+                        <Button x:Name="RemoveFilterButton" Width="180" HorizontalAlignment="Left" Margin="0,8,0,0" Content="Quitar filtro seleccionado" Click="RemoveFilter_Click" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="4" Margin="0,10,0,0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFFDFDFD">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock FontWeight="SemiBold" Text="Columnas seleccionadas" />
+                            <Button x:Name="SelectAllColumnsButton" Margin="12,0,0,0" Width="120" Content="Seleccionar todas" Click="SelectAllColumns_Click" />
+                            <Button x:Name="DefaultColumnsButton" Margin="8,0,0,0" Width="130" Content="Conjunto predeterminado" Click="DefaultColumns_Click" />
+                        </StackPanel>
+                        <WrapPanel x:Name="ColumnsWrapPanel" Margin="0,8,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Grid Grid.Row="5" Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <TextBlock x:Name="TotalCountText" FontWeight="SemiBold" Text="Total: 0" />
+                        <TextBlock Margin="16,0,0,0" x:Name="PageCountText" FontWeight="SemiBold" Text="Filas de página: 0" />
+                        <TextBlock Margin="16,0,0,0" x:Name="LatestImportText" FontWeight="SemiBold" Text="Última fecha de importación: n/d" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button x:Name="PrevPageButton" Width="110" Content="Página anterior" Click="PrevPage_Click" />
+                        <Button x:Name="NextPageButton" Margin="8,0,0,0" Width="110" Content="Página siguiente" Click="NextPage_Click" />
+                    </StackPanel>
+                </Grid>
+
+                <DataGrid x:Name="PreviewDataGrid"
+                          Grid.Row="6"
+                          Margin="0,10,0,0"
+                          AutoGenerateColumns="True"
+                          IsReadOnly="True"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          HeadersVisibility="Column"
+                          Height="260" />
+
+                <Border Grid.Row="7" Margin="0,10,0,0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFF9F9F9">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="Exportar CSV" />
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="140" />
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="120" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="ExportPathTextBox" Grid.Column="0" Margin="0,0,8,0" />
+                            <Button x:Name="BrowseExportButton" Grid.Column="1" Margin="0,0,8,0" Content="Buscar" Click="BrowseExport_Click" />
+                            <Button x:Name="ExportCsvButton" Grid.Column="2" Margin="0,0,8,0" Content="Exportar" Click="ExportCsv_Click" />
+                            <Button x:Name="CancelExportButton" Grid.Column="3" Content="Cancelar exportación" Click="CancelExport_Click" />
+                        </Grid>
+                        <ProgressBar x:Name="ExportProgressBar" Margin="0,8,0,0" Height="14" IsIndeterminate="True" Visibility="Collapsed" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="8" Margin="0,10,0,0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFFDFDFD">
+                    <TextBlock x:Name="StatusText" TextWrapping="Wrap" Text="Listo." />
+                </Border>
+            </Grid>
+        </ScrollViewer>
+
+        <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Center" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" Background="#FFDDDDDD" />
+
+        <controls:ActivityConsoleControl x:Name="ActivityConsole" Grid.Row="2" />
+    </Grid>
+</UserControl>

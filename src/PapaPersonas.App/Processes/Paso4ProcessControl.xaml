@@ -1,0 +1,129 @@
+<UserControl x:Class="PapaPersonas.App.Processes.Paso4ProcessControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:controls="clr-namespace:PapaPersonas.App.Controls"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="760"
+             d:DesignWidth="1000">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="6" />
+            <RowDefinition Height="110" MinHeight="100" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid Margin="0,0,6,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFFDFDFD">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="Proceso 4 - Stock y extracciones" />
+                        <TextBlock Margin="0,4,0,0" TextWrapping="Wrap"
+                                   Text="Generá stock por fecha, exportá resúmenes/completos y gestioná extracciones con recuperación pendiente." />
+                    </StackPanel>
+                </Border>
+
+                <Grid Grid.Row="1" Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="170" />
+                        <ColumnDefinition Width="230" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="Fecha de importación" />
+                    <ComboBox x:Name="DateComboBox" Grid.Column="1" Margin="8,4" SelectionChanged="DateComboBox_SelectionChanged" />
+
+                    <StackPanel Grid.Column="3" Margin="8,0,0,0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Estado: " FontWeight="SemiBold" />
+                        <TextBlock x:Name="StockBadgeText" FontWeight="Bold" Text="STOCK no generado" />
+                        <TextBlock Margin="16,0,0,0" x:Name="StockMetaText" Text="-" />
+                    </StackPanel>
+                </Grid>
+
+                <Border Grid.Row="2" Margin="0,8,0,0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFF9F9F9">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="MetricTotalText" Grid.Column="0" Text="Total: 0" FontWeight="SemiBold" />
+                        <TextBlock x:Name="MetricSoldText" Grid.Column="1" Text="Vendidos: 0" FontWeight="SemiBold" />
+                        <TextBlock x:Name="MetricAvailableText" Grid.Column="2" Text="Disponibles: 0" FontWeight="SemiBold" />
+                        <TextBlock x:Name="MetricGroupsText" Grid.Column="3" Text="Grupos OS: 0" FontWeight="SemiBold" />
+                    </Grid>
+                </Border>
+
+                <TextBlock x:Name="DateWarningText" Grid.Row="3" Margin="0,8,0,0" Foreground="#FFB45F06" TextWrapping="Wrap" Visibility="Collapsed" />
+
+                <Border Grid.Row="4" Margin="0,10,0,0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFFDFDFD">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="Preparación y exportaciones" />
+                        <WrapPanel Margin="0,8,0,0" Orientation="Horizontal" ItemHeight="34">
+                            <Button x:Name="GenerateStockButton" Width="180" Margin="0,0,8,8" Content="Generar stock" Click="GenerateStock_Click" />
+                            <Button x:Name="SelectColumnsButton" Width="180" Margin="0,0,8,8" Content="Seleccionar columnas" Click="SelectColumns_Click" />
+                            <Button x:Name="ExportSummaryButton" Width="180" Margin="0,0,8,8" Content="Exportar resumen" Click="ExportSummary_Click" />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,8,8" VerticalAlignment="Center">
+                                <Button x:Name="ExportFullButton" Width="180" Content="Exportar stock completo" Click="ExportFull_Click" />
+                                <CheckBox x:Name="OnlyAvailableCheckBox" Margin="10,0,0,0" VerticalAlignment="Center" Content="Sólo stock disponible" />
+                            </StackPanel>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="5" Margin="0,10,0,0" Padding="8" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFFDFDFD">
+                    <DataGrid x:Name="SummaryGrid"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              IsReadOnly="False"
+                              HeadersVisibility="Column">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="ORDEN" Binding="{Binding Orden}" IsReadOnly="True" Width="80" />
+                            <DataGridTextColumn Header="COD_O_SOCIAL" Binding="{Binding CodigoObraSocialDisplay}" IsReadOnly="True" Width="150" />
+                            <DataGridTextColumn Header="DESCRIPCIÓN_O_SOCIAL" Binding="{Binding ObraSocialDisplay}" IsReadOnly="True" Width="*" MinWidth="220" />
+                            <DataGridTextColumn Header="TOTAL" Binding="{Binding Total}" IsReadOnly="True" Width="90" />
+                            <DataGridTextColumn Header="VENDIDOS" Binding="{Binding Sold}" IsReadOnly="True" Width="90" />
+                            <DataGridTextColumn Header="DISPONIBLES" Binding="{Binding Available}" IsReadOnly="True" Width="110" />
+                            <DataGridTextColumn Header="Cantidad a extraer" Binding="{Binding QuantityText, UpdateSourceTrigger=PropertyChanged}" Width="140" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Border>
+
+                <Border Grid.Row="6" Margin="0,10,0,0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFFDFDFD">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="Operación diaria" />
+                        <StackPanel Margin="0,8,0,0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock x:Name="SelectionTotalsText" FontWeight="SemiBold" Text="Grupos seleccionados: 0 | Personas solicitadas: 0" />
+                            <Button x:Name="ClearQuantitiesButton" Margin="16,0,0,0" Width="150" Content="Limpiar cantidades" Click="ClearQuantities_Click" />
+                        </StackPanel>
+
+                        <WrapPanel Margin="0,10,0,0" Orientation="Horizontal" ItemHeight="34">
+                            <Button x:Name="ExtractSelectionButton" Width="180" Margin="0,0,8,8" Content="Extraer selección" Click="ExtractSelection_Click" FontWeight="SemiBold" />
+                            <ComboBox x:Name="CompletedExtractionsComboBox" Width="300" Margin="0,0,8,8" DisplayMemberPath="Display" SelectedValuePath="Token" />
+                            <Button x:Name="ReExportExtractionButton" Width="180" Margin="0,0,8,8" Content="Reexportar extracción" Click="ReExportExtraction_Click" />
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+
+        <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Center" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" Background="#FFDDDDDD" />
+
+        <controls:ActivityConsoleControl x:Name="ActivityConsole" Grid.Row="2" />
+    </Grid>
+</UserControl>

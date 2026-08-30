@@ -1,0 +1,101 @@
+<UserControl x:Class="PapaPersonas.App.Processes.Paso2ProcessControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
+             xmlns:controls="clr-namespace:PapaPersonas.App.Controls"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="700"
+             d:DesignWidth="980">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="6" />
+            <RowDefinition Height="110" MinHeight="100" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid Margin="0,0,6,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="210" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="XLSX de Sergio" />
+                <TextBox x:Name="Paso2InputPathTextBox" Grid.Row="0" Grid.Column="1" Margin="8,4" IsReadOnly="False" TextChanged="Paso2InputPathTextBox_TextChanged"
+                          automation:AutomationProperties.Name="Ruta del XLSX de devolución de Sergio"
+                          automation:AutomationProperties.HelpText="Ruta del archivo de Sergio usado para analizar y aplicar la importación." />
+                <Button x:Name="Paso2BrowseInputButton" Grid.Row="0" Grid.Column="2" Margin="8,4" Content="Buscar archivo" Click="BrowsePaso2Input_Click"
+                        automation:AutomationProperties.Name="Buscar XLSX de devolución de Sergio"
+                        automation:AutomationProperties.HelpText="Abre un selector para el archivo de devolución de Sergio." />
+
+                <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Carpeta de rechazados (opcional)" />
+                <TextBox x:Name="Paso2RejectedFolderTextBox" Grid.Row="1" Grid.Column="1" Margin="8,4" IsReadOnly="False"
+                          automation:AutomationProperties.Name="Carpeta de salida de rechazados"
+                          automation:AutomationProperties.HelpText="Carpeta de destino para el CSV opcional de rechazados de la aplicación de Paso 2." />
+                <Button x:Name="Paso2BrowseRejectedFolderButton" Grid.Row="1" Grid.Column="2" Margin="8,4" Content="Buscar carpeta" Click="BrowsePaso2RejectedFolder_Click"
+                        automation:AutomationProperties.Name="Buscar carpeta de salida de rechazados"
+                        automation:AutomationProperties.HelpText="Abre un selector para la carpeta del CSV de rechazados de Paso 2." />
+
+                <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Fecha de importación (dd / MM / yyyy)" />
+                <StackPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="8,4" Orientation="Horizontal">
+                    <TextBox x:Name="Paso2ImportDayTextBox" Width="60" MaxLength="2" TextChanged="Paso2ImportDatePart_TextChanged"
+                              automation:AutomationProperties.Name="Día de importación"
+                              automation:AutomationProperties.HelpText="Día de importación con dos dígitos." />
+                    <TextBlock Margin="8,0" VerticalAlignment="Center" Text="/" />
+                    <TextBox x:Name="Paso2ImportMonthTextBox" Width="60" MaxLength="2" TextChanged="Paso2ImportDatePart_TextChanged"
+                              automation:AutomationProperties.Name="Mes de importación"
+                              automation:AutomationProperties.HelpText="Mes de importación con dos dígitos." />
+                    <TextBlock Margin="8,0" VerticalAlignment="Center" Text="/" />
+                    <TextBox x:Name="Paso2ImportYearTextBox" Width="90" MaxLength="4" TextChanged="Paso2ImportDatePart_TextChanged"
+                              automation:AutomationProperties.Name="Año de importación"
+                              automation:AutomationProperties.HelpText="Año de importación con cuatro dígitos." />
+                </StackPanel>
+
+                <StackPanel Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Margin="8,8,0,0" Orientation="Horizontal">
+                    <Button x:Name="AnalyzePaso2Button" Content="Analizar archivo" Width="140" Click="AnalyzePaso2_Click"
+                            automation:AutomationProperties.Name="Analizar archivo de Sergio"
+                            automation:AutomationProperties.HelpText="Ejecuta la vista previa de Paso 2A sin modificar personas." />
+                    <Button x:Name="ApplyPaso2Button" Margin="12,0,0,0" Content="Confirmar y aplicar" Width="160" IsEnabled="False" Click="ApplyPaso2_Click"
+                            automation:AutomationProperties.Name="Confirmar y aplicar Paso 2"
+                            automation:AutomationProperties.HelpText="Confirma y aplica en personas la importación analizada." />
+                    <Button x:Name="OpenPaso2OutputFolderButton" Margin="12,0,0,0" Content="Abrir carpeta de salida" Width="170" IsEnabled="False" Click="OpenPaso2OutputFolder_Click"
+                            automation:AutomationProperties.Name="Abrir carpeta de salida de Paso 2"
+                            automation:AutomationProperties.HelpText="Abre la carpeta del CSV de rechazados cuando está disponible." />
+                </StackPanel>
+
+                <StackPanel Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,12,0,0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="Paso2StatusText" FontWeight="SemiBold" Text="Listo." />
+                    <ProgressBar x:Name="Paso2ProgressBar" Margin="16,0,0,0" Width="220" Height="14" IsIndeterminate="True" Visibility="Collapsed" />
+                </StackPanel>
+
+                <Border Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,12,0,0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFFDFDFD" MaxHeight="220">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <TextBlock x:Name="Paso2SummaryText" TextWrapping="Wrap" Text="Todavía no se realizó un análisis." />
+                    </ScrollViewer>
+                </Border>
+
+                <Border Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,12,0,0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFF9F9F9" MaxHeight="110">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <TextBlock x:Name="Paso2ImportRefText" TextWrapping="Wrap" Text="Referencia de importación: no analizada." />
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+
+        <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Center" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" Background="#FFDDDDDD" />
+
+        <controls:ActivityConsoleControl x:Name="ActivityConsole" Grid.Row="2" />
+    </Grid>
+</UserControl>

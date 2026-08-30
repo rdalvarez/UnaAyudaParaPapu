@@ -1,0 +1,38 @@
+<UserControl x:Class="PapaPersonas.App.Controls.ActivityConsoleControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="220"
+             d:DesignWidth="900">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,8">
+            <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" FontWeight="SemiBold" Text="Actividad" />
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button x:Name="CopyButton" Width="76" Content="Copiar" Click="CopyButton_Click" Margin="0,0,8,0" />
+                <Button x:Name="ClearButton" Width="76" Content="Limpiar" Click="ClearButton_Click" />
+            </StackPanel>
+        </DockPanel>
+
+        <Border Grid.Row="1" BorderBrush="#FFE0E0E0" BorderThickness="1" CornerRadius="6" Padding="6" Background="#FFF8F8F8">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                <TextBox x:Name="ConsoleTextBox"
+                         IsReadOnly="True"
+                         AcceptsReturn="True"
+                         TextWrapping="NoWrap"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         VerticalScrollBarVisibility="Disabled"
+                         HorizontalScrollBarVisibility="Disabled"
+                         FontFamily="Consolas"
+                         FontSize="12" />
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</UserControl>

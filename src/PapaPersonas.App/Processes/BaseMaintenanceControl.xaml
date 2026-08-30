@@ -1,0 +1,75 @@
+<UserControl x:Class="PapaPersonas.App.Processes.BaseMaintenanceControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:controls="clr-namespace:PapaPersonas.App.Controls"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="520"
+             d:DesignWidth="1000">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="6" />
+            <RowDefinition Height="110" MinHeight="100" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid Margin="0,0,6,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFFDFDFD">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="Mantenimiento de base" />
+                        <TextBlock Margin="0,4,0,0" TextWrapping="Wrap"
+                                    Text="Las operaciones requieren cerrar DBeaver y cualquier herramienta externa DuckDB. Los cambios destructivos siempre guardan un resguardo automático en %LOCALAPPDATA%\PapaPersonas\backups antes de tocar la base en uso." />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="1" Margin="0,10,0,0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFF9F9F9">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="190" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Text="Base activa" />
+                        <TextBlock x:Name="DatabasePathText" Grid.Column="1" Margin="8,0,0,0" TextWrapping="Wrap" Text="No disponible." />
+
+                        <TextBlock Grid.Column="0" Margin="0,32,0,0" VerticalAlignment="Center" FontWeight="SemiBold" Text="Resguardo automático" />
+                        <TextBlock x:Name="SafetyBackupRootText" Grid.Column="1" Margin="8,32,0,0" TextWrapping="Wrap" Text="No disponible." />
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="2" Margin="0,10,0,0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFFDFDFD">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="Operaciones" />
+                        <WrapPanel Margin="0,8,0,0" Orientation="Horizontal">
+                            <Button x:Name="BackupButton" Width="180" Margin="0,0,8,8" Content="Crear copia" Click="Backup_Click" />
+                            <Button x:Name="RestoreButton" Width="180" Margin="0,0,8,8" Content="Restaurar copia" Click="Restore_Click" />
+                            <Button x:Name="ResetButton" Width="180" Margin="0,0,8,8" Content="Reiniciar base" Click="Reset_Click" />
+                        </WrapPanel>
+                        <TextBlock TextWrapping="Wrap"
+                                    Text="Restaurar reemplaza todo el estado operativo (personas, importaciones, stock, ventas y extracciones). Crear y restaurar copias requieren confirmar el acceso exclusivo; nunca cierran herramientas externas." />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="3" Margin="0,10,0,0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFF9F9F9">
+                    <StackPanel>
+                        <TextBlock x:Name="StatusText" TextWrapping="Wrap" Text="Listo." />
+                        <ProgressBar x:Name="WorkingProgressBar" Margin="0,8,0,0" Height="14" IsIndeterminate="True" Visibility="Collapsed" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+
+        <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Center" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" Background="#FFDDDDDD" />
+
+        <controls:ActivityConsoleControl x:Name="ActivityConsole" Grid.Row="2" />
+    </Grid>
+</UserControl>

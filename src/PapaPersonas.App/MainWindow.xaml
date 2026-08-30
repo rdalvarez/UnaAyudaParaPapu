@@ -1,0 +1,53 @@
+<Window x:Class="PapaPersonas.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:processes="clr-namespace:PapaPersonas.App.Processes"
+        mc:Ignorable="d"
+        Title="PapaPersonas"
+        Height="700"
+        Width="1100"
+        MinHeight="580"
+        MinWidth="960"
+        WindowStartupLocation="CenterScreen">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="12" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="12" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Padding="12" CornerRadius="8" BorderBrush="#FFE6E6E6" BorderThickness="1" Background="#FFFDFDFD">
+            <TextBlock FontSize="24" FontWeight="Bold" Text="PapaPersonas" />
+        </Border>
+
+        <TabControl Grid.Row="2">
+            <TabItem Header="1. Preparar datos de Hernán">
+                <processes:Paso1ProcessControl x:Name="Paso1Control" Margin="6" />
+            </TabItem>
+
+            <TabItem Header="2. Actualizar base de Sergio">
+                <processes:Paso2ProcessControl x:Name="Paso2Control" Margin="6" />
+            </TabItem>
+
+            <TabItem Header="3. Consultar datos">
+                <processes:Paso3ProcessControl x:Name="Paso3Control" Margin="6" />
+            </TabItem>
+
+            <TabItem Header="4. Stock y extracciones">
+                <processes:Paso4ProcessControl x:Name="Paso4Control" Margin="6" />
+            </TabItem>
+
+            <TabItem Header="5. Mantenimiento de base">
+                <processes:BaseMaintenanceControl x:Name="MaintenanceControl" Margin="6" />
+            </TabItem>
+        </TabControl>
+
+        <Border Grid.Row="4" Padding="8" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFF9F9F9">
+            <TextBlock x:Name="DbStatusText" TextWrapping="Wrap" FontSize="12" Text="Estado de la base pendiente..." />
+        </Border>
+    </Grid>
+</Window>

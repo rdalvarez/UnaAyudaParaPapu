@@ -1,0 +1,81 @@
+<UserControl x:Class="PapaPersonas.App.Processes.Paso1ProcessControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
+             xmlns:controls="clr-namespace:PapaPersonas.App.Controls"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="700"
+             d:DesignWidth="980">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="6" />
+            <RowDefinition Height="110" MinHeight="100" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid Margin="0,0,6,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="170" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="XLSX de entrada" />
+                <TextBox x:Name="InputPathTextBox" Grid.Row="0" Grid.Column="1" Margin="8,4" IsReadOnly="False" />
+                <Button x:Name="BrowseInputButton" Grid.Row="0" Grid.Column="2" Margin="8,4" Content="Buscar archivo" Click="BrowseInput_Click"
+                        automation:AutomationProperties.Name="Buscar archivo XLSX de entrada"
+                        automation:AutomationProperties.HelpText="Abre un selector para elegir el archivo XLSX de Hernán." />
+
+                <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Carpeta de salida" />
+                <TextBox x:Name="OutputPathTextBox" Grid.Row="1" Grid.Column="1" Margin="8,4" IsReadOnly="False" />
+                <Button x:Name="BrowseOutputButton" Grid.Row="1" Grid.Column="2" Margin="8,4" Content="Buscar carpeta" Click="BrowseOutput_Click"
+                        automation:AutomationProperties.Name="Buscar carpeta de salida"
+                        automation:AutomationProperties.HelpText="Abre un selector para la carpeta de salida de Paso 1." />
+
+                <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Configuración JSON" />
+                <TextBox x:Name="ConfigPathTextBox" Grid.Row="2" Grid.Column="1" Margin="8,4" IsReadOnly="False" />
+                <Button x:Name="BrowseConfigButton" Grid.Row="2" Grid.Column="2" Margin="8,4" Content="Buscar configuración" Click="BrowseConfig_Click"
+                        automation:AutomationProperties.Name="Buscar configuración JSON"
+                        automation:AutomationProperties.HelpText="Abre un selector para elegir la configuración JSON PARA_HERNAN." />
+
+                <StackPanel Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Margin="8,8,0,0" Orientation="Horizontal">
+                    <Button x:Name="EditConfigButton" Content="Abrir/editar configuración" Width="170" Click="EditConfig_Click"
+                            automation:AutomationProperties.Name="Abrir o editar configuración"
+                            automation:AutomationProperties.HelpText="Abre la configuración JSON actual en el editor predeterminado." />
+                    <Button x:Name="RunPaso1Button" Margin="12,0,0,0" Content="Ejecutar Paso 1" Width="140" Click="RunPaso1_Click"
+                            automation:AutomationProperties.Name="Ejecutar Paso 1"
+                            automation:AutomationProperties.HelpText="Ejecuta Paso 1 y genera los CSV de Sergio y rechazados." />
+                    <Button x:Name="OpenOutputFolderButton" Margin="12,0,0,0" Content="Abrir carpeta de salida" Width="170" IsEnabled="False" Click="OpenOutputFolder_Click"
+                            automation:AutomationProperties.Name="Abrir carpeta de salida"
+                            automation:AutomationProperties.HelpText="Abre la carpeta donde se generaron los archivos de Paso 1." />
+                </StackPanel>
+
+                <StackPanel Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,12,0,0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="RunStatusText" FontWeight="SemiBold" Text="Listo." />
+                    <ProgressBar x:Name="RunProgressBar" Margin="16,0,0,0" Width="220" Height="14" IsIndeterminate="True" Visibility="Collapsed" />
+                </StackPanel>
+
+                <Border Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,12,0,0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFFDFDFD" MaxHeight="180">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <TextBlock x:Name="SummaryText" TextWrapping="Wrap" Text="Todavía no se ejecutó el proceso." />
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+
+        <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Center" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" Background="#FFDDDDDD" />
+
+        <controls:ActivityConsoleControl x:Name="ActivityConsole" Grid.Row="2" />
+    </Grid>
+</UserControl>

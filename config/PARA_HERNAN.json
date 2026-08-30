@@ -1,0 +1,10 @@
+{
+  "outputColumns": [
+    { "outputName": "CUIL", "sourceName": "CUIL" },
+    { "outputName": "APELLIDO_NOMBRE", "sourceName": "CUIL_APENOM" },
+    { "outputName": "CD_OS", "sourceName": "CUIL_CODOS" },
+    { "outputName": "DESCRIPCION O_S", "sourceName": "CUIL_DESCRIPOS" },
+    { "outputName": "FECHA_NAC", "sourceName": "CUIL_FECHANAC" },
+    { "outputName": "EDAD", "sourceName": "CUIL_EDAD" }
+  ]
+}
