@@ -24,7 +24,7 @@ public sealed class DatabaseMaintenanceNamingTests
     public void MaintenanceConfirmation_RestorePrompt_DescribesExclusiveTotalRollback()
     {
         Assert.Contains("DBeaver", DatabaseMaintenanceConfirmation.RestorePrompt, StringComparison.Ordinal);
-        Assert.Contains("TODO el snapshot operativo", DatabaseMaintenanceConfirmation.RestorePrompt, StringComparison.Ordinal);
+        Assert.Contains("TODO el estado operativo", DatabaseMaintenanceConfirmation.RestorePrompt, StringComparison.Ordinal);
         Assert.Contains("personas", DatabaseMaintenanceConfirmation.RestorePrompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("stock", DatabaseMaintenanceConfirmation.RestorePrompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("ventas", DatabaseMaintenanceConfirmation.RestorePrompt, StringComparison.OrdinalIgnoreCase);

@@ -11,5 +11,5 @@ public static class DatabaseMaintenanceConfirmation
 
     public static readonly string RestorePrompt =
         ExternalToolsWarning + Environment.NewLine + Environment.NewLine +
-        "La restauración reemplazará TODO el snapshot operativo: personas, importaciones, stock, ventas y extracciones. Se conservará un resguardo automático de la base actual. ¿Desea continuar?";
+        "La restauración reemplazará TODO el estado operativo: personas, importaciones, stock, ventas y extracciones. Se conservará un resguardo automático de la base actual. ¿Desea continuar?";
 }

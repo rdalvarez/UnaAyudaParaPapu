@@ -13,7 +13,7 @@
             <RowDefinition Height="220" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <TextBlock Grid.Row="0" Margin="0,0,0,12" TextWrapping="Wrap" Text="El archivo contiene columnas desconocidas. Se ignorarán y no se guardarán en la base, el staging ni los metadatos de importación." />
+        <TextBlock Grid.Row="0" Margin="0,0,0,12" TextWrapping="Wrap" Text="El archivo contiene columnas desconocidas. Se ignorarán y no se guardarán en la base, el área de preparación ni los metadatos de importación." />
         <ListBox x:Name="UnknownHeadersList" Grid.Row="1" />
         <StackPanel Grid.Row="2" Margin="0,16,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
             <Button Width="110" Margin="0,0,10,0" Content="Cancelar" IsCancel="True" Click="Cancel_Click" />

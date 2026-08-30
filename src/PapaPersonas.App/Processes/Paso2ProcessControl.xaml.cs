@@ -311,7 +311,7 @@ public partial class Paso2ProcessControl : System.Windows.Controls.UserControl
         _state.BeginWork();
         Paso2StatusText.Foreground = StatusBrushes.Info;
         Paso2StatusText.Text = "Aplicando importación...";
-        Paso2SummaryText.Text = "Se aplican sólo las filas válidas agregadas en staging para la referencia actual.";
+        Paso2SummaryText.Text = "Se aplican sólo las filas válidas agregadas en el área de preparación para la referencia actual.";
         LogInfo("Proceso 2", $"Aplicación iniciada para import_id={importId:D}.");
 
         try

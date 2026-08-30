@@ -8,7 +8,7 @@ public static class SergioUnknownHeadersConfirmation
         ArgumentNullException.ThrowIfNull(unknownHeaders);
 
         var headers = string.Join(Environment.NewLine, unknownHeaders.Select(header => $"• {header}"));
-        return "El archivo contiene columnas desconocidas. Se ignorarán y no se guardarán en la base, el staging ni los metadatos de importación." +
+        return "El archivo contiene columnas desconocidas. Se ignorarán y no se guardarán en la base, el área de preparación ni los metadatos de importación." +
                Environment.NewLine + Environment.NewLine +
                "Columnas que se ignorarán:" + Environment.NewLine +
                headers + Environment.NewLine + Environment.NewLine +
