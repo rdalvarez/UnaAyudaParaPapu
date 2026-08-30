@@ -61,7 +61,7 @@ public sealed class DuckDbPaso3ExportService : IPaso3ExportService
                         localRows++;
                         if (localRows == 1 || localRows % 1000 == 0)
                         {
-                            progress?.Report(new Paso3ExportProgress(localRows, $"Progreso de exportación: {localRows} filas escritas."));
+                            progress?.Report(new Paso3ExportProgress(localRows, FormatProgressMessage(localRows)));
                         }
                     }
 
@@ -85,5 +85,12 @@ public sealed class DuckDbPaso3ExportService : IPaso3ExportService
                     "No se pudo completar la exportación. Verificá la ruta de destino y volvé a intentar.",
                     ex));
         }
+    }
+
+    private static string FormatProgressMessage(int rowsWritten)
+    {
+        return rowsWritten == 1
+            ? "Progreso de exportación: 1 fila escrita."
+            : $"Progreso de exportación: {rowsWritten} filas escritas.";
     }
 }

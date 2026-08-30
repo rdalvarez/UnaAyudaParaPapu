@@ -51,6 +51,54 @@ public sealed class DuckDbPaso3ExportServiceTests
     }
 
     [Fact]
+    public async Task ExportCsvAsync_Progress_UsesSingularAtFirstRowAndPluralAtThousandRows()
+    {
+        using var ctx = CreateDbContext();
+        using (var connection = OpenConnection(ctx.DatabasePath))
+        {
+            for (var i = 0; i < 1000; i++)
+            {
+                InsertPersona(
+                    connection,
+                    (20120000000L + i).ToString(CultureInfo.InvariantCulture),
+                    "PROGRESS",
+                    "ROW",
+                    "2026-08-10",
+                    "2026-08-12 10:00:00");
+            }
+        }
+
+        var progressEvents = new List<Paso3ExportProgress>();
+        var progress = new SynchronousProgress<Paso3ExportProgress>(progressEvents.Add);
+        var result = await new DuckDbPaso3ExportService().ExportCsvAsync(
+            new Paso3ExportRequest(
+                new Paso3PreviewRequest(ctx.DatabasePath, null, [], null, null, ["cuil"], 1, 2000),
+                Path.Combine(ctx.RootDirectory, "query-export-progress.csv")),
+            progress,
+            CancellationToken.None);
+
+        Assert.Equal(Paso3ExportStatus.Completed, result.Status);
+        Assert.Equal(1000, result.RowsWritten);
+        Assert.Collection(
+            progressEvents,
+            first =>
+            {
+                Assert.Equal(1, first.RowsWritten);
+                Assert.Equal("Progreso de exportación: 1 fila escrita.", first.Message);
+            },
+            thousand =>
+            {
+                Assert.Equal(1000, thousand.RowsWritten);
+                Assert.Equal("Progreso de exportación: 1000 filas escritas.", thousand.Message);
+            },
+            completed =>
+            {
+                Assert.Equal(1000, completed.RowsWritten);
+                Assert.Equal("Exportación completada.", completed.Message);
+            });
+    }
+
+    [Fact]
     public async Task ExportCsvAsync_Cancelled_StopsAndDeletesPartialTempFile()
     {
         using var ctx = CreateDbContext();
@@ -203,6 +251,11 @@ public sealed class DuckDbPaso3ExportServiceTests
 
         Assert.NotNull(exception);
         return exception!.Message;
+    }
+
+    private sealed class SynchronousProgress<T>(Action<T> handler) : IProgress<T>
+    {
+        public void Report(T value) => handler(value);
     }
 
     private sealed class TestDbContext : IDisposable
