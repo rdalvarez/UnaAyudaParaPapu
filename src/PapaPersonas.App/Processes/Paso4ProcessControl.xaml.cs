@@ -687,7 +687,7 @@ public partial class Paso4ProcessControl : System.Windows.Controls.UserControl
         using var dialog = new Forms.SaveFileDialog
         {
             Title = title,
-            Filter = "CSV files (*.csv)|*.csv",
+            Filter = "Archivos CSV (*.csv)|*.csv",
             AddExtension = true,
             OverwritePrompt = true,
             FileName = suggestedFileName
