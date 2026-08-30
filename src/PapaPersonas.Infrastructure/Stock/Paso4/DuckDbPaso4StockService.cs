@@ -48,33 +48,40 @@ public sealed class DuckDbPaso4StockService : IPaso4StockService
             }
 
             using var connection = DuckDbPaso3QueryService.OpenConnection(request.DatabasePath);
+            // La generación y regeneración se ejecutan en una única transacción para que el encabezado y sus integrantes representen el mismo snapshot.
             using var transaction = connection.BeginTransaction();
 
+            // Se bloquea la regeneración si el stock actual conserva una extracción pendiente, para no reemplazar datos protegidos por esa operación.
             if (CurrentStockHasPendingToken(connection, transaction))
             {
                 transaction.Rollback();
                 return Paso4GenerateStockResult.ValidationFailed("El stock actual tiene una extracción pendiente.");
             }
 
+            // Confirma que la fecha elegida tenga personas cargadas antes de construir el snapshot.
             if (!SelectedDateExists(connection, transaction, request.SelectedFechaImportacion))
             {
                 transaction.Rollback();
                 return Paso4GenerateStockResult.ValidationFailed("No se encontró la fecha_importacion seleccionada en personas.");
             }
 
+            // Identifica la importación completada más reciente de la fecha elegida para conservar la trazabilidad del snapshot.
             var latestImportForDate = QueryLatestSuccessfulImportForDate(connection, transaction, request.SelectedFechaImportacion);
 
+            // Busca el stock generado más recientemente para decidir si la operación reemplaza su contenido o crea el primer snapshot.
             var currentStockId = QueryCurrentStockId(connection, transaction);
             var stockId = currentStockId ?? Guid.NewGuid();
 
             if (currentStockId.HasValue)
             {
+                // Al regenerar, elimina los integrantes anteriores para reemplazarlos íntegramente por la selección nueva.
                 ExecuteNonQuery(
                     connection,
                     transaction,
                     "DELETE FROM stock_members WHERE stock_id = $stockId;",
                     new DuckDBParameter("stockId", currentStockId.Value));
 
+                // Actualiza el encabezado existente con el origen elegido y deja el snapshot sin una extracción pendiente.
                 ExecuteNonQuery(
                     connection,
                     transaction,
@@ -96,6 +103,7 @@ public sealed class DuckDbPaso4StockService : IPaso4StockService
             }
             else
             {
+                // Crea el encabezado del primer snapshot y registra la fecha elegida y la importación completada cuando está disponible.
                 ExecuteNonQuery(
                     connection,
                     transaction,
@@ -105,12 +113,14 @@ public sealed class DuckDbPaso4StockService : IPaso4StockService
                     new DuckDBParameter("importId", (object?)latestImportForDate ?? DBNull.Value));
             }
 
+            // Cuenta las personas sin orden de origen para informar cuántas recibirán un orden de compatibilidad durante la carga.
             var fallbackCount = ExecuteScalarInt(
                 connection,
                 transaction,
                 "SELECT COUNT(*) FROM personas WHERE fecha_importacion = $date AND source_row_number IS NULL;",
                 new DuckDBParameter("date", request.SelectedFechaImportacion));
 
+            // Construye el snapshot de la fecha elegida, conservando el orden de origen y asignando un orden determinista a filas sin ese metadato.
             ExecuteNonQuery(
                 connection,
                 transaction,
@@ -150,6 +160,7 @@ public sealed class DuckDbPaso4StockService : IPaso4StockService
                 new DuckDBParameter("stockId", stockId),
                 new DuckDBParameter("date", request.SelectedFechaImportacion));
 
+            // Verifica cuántos integrantes quedaron asociados al snapshot para devolver el resultado de generación.
             var insertedCount = ExecuteScalarInt(
                 connection,
                 transaction,
@@ -266,6 +277,7 @@ public sealed class DuckDbPaso4StockService : IPaso4StockService
             var selectList = string.Join(", ", selected.Select(column => $"{Paso4ColumnCatalog.SelectExpressions[column]} AS {column}"));
             var whereExtra = request.OnlyAvailable ? "AND sm.vendido = FALSE" : string.Empty;
 
+            // Consulta las filas del snapshot actual con las columnas permitidas y, si corresponde, sólo las aún disponibles para el archivo completo.
             var sql =
                 $"""
                 SELECT {selectList}
@@ -317,6 +329,7 @@ public sealed class DuckDbPaso4StockService : IPaso4StockService
 
     private static List<Paso4DateOption> QueryAvailableDates(DuckDBConnection connection)
     {
+        // Ofrece las cinco fechas de importación más recientes disponibles para seleccionar el origen del stock.
         using var command = connection.CreateCommand();
         command.CommandText =
             """
@@ -340,6 +353,7 @@ public sealed class DuckDbPaso4StockService : IPaso4StockService
 
     private static (DateOnly? ImportDate, Guid? ImportId) QueryLatestSuccessfulImport(DuckDBConnection connection)
     {
+        // Identifica la importación completada más reciente para comparar la actualidad del stock con su fuente.
         using var command = connection.CreateCommand();
         command.CommandText =
             """
@@ -365,6 +379,7 @@ public sealed class DuckDbPaso4StockService : IPaso4StockService
 
     private static Guid? QueryLatestSuccessfulImportForDate(DuckDBConnection connection, System.Data.Common.DbTransaction tx, DateOnly date)
     {
+        // Obtiene la última importación completada de la fecha elegida para mantener la referencia de origen del snapshot.
         using var command = connection.CreateCommand();
         command.Transaction = tx;
         command.CommandText =
@@ -387,6 +402,7 @@ public sealed class DuckDbPaso4StockService : IPaso4StockService
         DuckDBConnection connection,
         (DateOnly? ImportDate, Guid? ImportId) latestSuccessful)
     {
+        // Recupera el stock generado más recientemente, sus conteos y su estado de extracción para mostrar el estado actual y detectar desactualización.
         using var command = connection.CreateCommand();
         command.CommandText =
             """
@@ -436,6 +452,7 @@ public sealed class DuckDbPaso4StockService : IPaso4StockService
 
     private static List<Paso4StockGroupSummaryRow> QuerySummaryGroups(DuckDBConnection connection, Guid stockId)
     {
+        // Resume el stock por código y obra social normalizados, conservando valores de presentación y calculando vendidos y disponibles.
         using var command = connection.CreateCommand();
         command.CommandText =
             """
@@ -486,12 +503,14 @@ public sealed class DuckDbPaso4StockService : IPaso4StockService
 
     private static bool CurrentStockHasPendingToken(DuckDBConnection connection, System.Data.Common.DbTransaction tx)
     {
+        // Comprueba si existe una extracción pendiente que deba protegerse antes de regenerar el stock.
         var count = ExecuteScalarInt(connection, tx, "SELECT COUNT(*) FROM stock_headers WHERE pending_extraction_token IS NOT NULL;");
         return count > 0;
     }
 
     private static bool SelectedDateExists(DuckDBConnection connection, System.Data.Common.DbTransaction tx, DateOnly selectedDate)
     {
+        // Comprueba que la fecha seleccionada tenga personas cargadas y, por tanto, pueda originar un snapshot.
         var count = ExecuteScalarInt(
             connection,
             tx,
@@ -502,6 +521,7 @@ public sealed class DuckDbPaso4StockService : IPaso4StockService
 
     private static Guid? QueryCurrentStockId(DuckDBConnection connection, System.Data.Common.DbTransaction tx)
     {
+        // Obtiene el snapshot generado más recientemente para reutilizarlo durante una regeneración.
         using var command = connection.CreateCommand();
         command.Transaction = tx;
         command.CommandText = "SELECT stock_id FROM stock_headers ORDER BY generated_utc DESC, stock_id DESC LIMIT 1;";
