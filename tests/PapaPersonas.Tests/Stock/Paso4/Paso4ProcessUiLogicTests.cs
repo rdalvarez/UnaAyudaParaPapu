@@ -52,6 +52,40 @@ public sealed class Paso4ProcessUiLogicTests
     }
 
     [Fact]
+    public void ExtractionConfirmation_UsesSingularPeopleAndGroup()
+    {
+        var message = Paso4ProcessUiLogic.BuildExtractionConfirmationMessage(new Paso4RequestTotals(1, 1));
+
+        Assert.Equal("Se extraerá 1 persona de 1 grupo. ¿Desea continuar?", message);
+    }
+
+    [Fact]
+    public void ExtractionConfirmation_UsesPluralPeopleAndGroups()
+    {
+        var message = Paso4ProcessUiLogic.BuildExtractionConfirmationMessage(new Paso4RequestTotals(2, 4));
+
+        Assert.Equal("Se extraerán 4 personas de 2 grupos. ¿Desea continuar?", message);
+    }
+
+    [Fact]
+    public void ExtractionConfirmation_AgreesIndependentlyForPeopleAndGroups()
+    {
+        var singularPeople = Paso4ProcessUiLogic.BuildExtractionConfirmationMessage(new Paso4RequestTotals(2, 1));
+        var singularGroup = Paso4ProcessUiLogic.BuildExtractionConfirmationMessage(new Paso4RequestTotals(1, 2));
+
+        Assert.Equal("Se extraerá 1 persona de 2 grupos. ¿Desea continuar?", singularPeople);
+        Assert.Equal("Se extraerán 2 personas de 1 grupo. ¿Desea continuar?", singularGroup);
+    }
+
+    [Theory]
+    [InlineData(1, "1 fila")]
+    [InlineData(2, "2 filas")]
+    public void RowCount_UsesSingularOrPluralSpanishPhrase(int rowCount, string expected)
+    {
+        Assert.Equal(expected, Paso4ProcessUiLogic.FormatRowCount(rowCount));
+    }
+
+    [Fact]
     public void ClearQuantities_ResetsAllRowsToEmpty()
     {
         var cleared = Paso4ProcessUiLogic.ClearQuantities(

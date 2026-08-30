@@ -436,7 +436,7 @@ public partial class Paso4ProcessControl : System.Windows.Controls.UserControl
             var totals = Paso4ProcessUiLogic.ComputeRequestTotals(rows);
             var confirm = MessageBox.Show(
                 Window.GetWindow(this) ?? System.Windows.Application.Current.MainWindow,
-                $"Se extraerán {totals.TotalPeopleRequested} personas en {totals.SelectedGroups} grupo(s). ¿Querés continuar?",
+                Paso4ProcessUiLogic.BuildExtractionConfirmationMessage(totals),
                 "Confirmar extracción",
                 MessageBoxButton.OKCancel,
                 MessageBoxImage.Question);
@@ -609,7 +609,7 @@ public partial class Paso4ProcessControl : System.Windows.Controls.UserControl
         var options = _extractionService.ListCompletedExtractions(dbPath)
             .Select(x => new Paso4CompletedExtractionDisplayItem(
                 x.Token,
-                $"{x.FechaVentaUtc:yyyy-MM-dd HH:mm:ss} - {x.RowCount} filas"))
+                $"{x.FechaVentaUtc:yyyy-MM-dd HH:mm:ss} - {Paso4ProcessUiLogic.FormatRowCount(x.RowCount)}"))
             .ToArray();
 
         CompletedExtractionsComboBox.ItemsSource = options;

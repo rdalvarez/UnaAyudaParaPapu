@@ -73,6 +73,20 @@ public static class Paso4ProcessUiLogic
         return new Paso4RequestTotals(groups, total);
     }
 
+    public static string BuildExtractionConfirmationMessage(Paso4RequestTotals totals)
+    {
+        var peopleVerb = totals.TotalPeopleRequested == 1 ? "Se extraerá" : "Se extraerán";
+        var peopleNoun = totals.TotalPeopleRequested == 1 ? "persona" : "personas";
+        var groupNoun = totals.SelectedGroups == 1 ? "grupo" : "grupos";
+
+        return $"{peopleVerb} {totals.TotalPeopleRequested} {peopleNoun} de {totals.SelectedGroups} {groupNoun}. ¿Desea continuar?";
+    }
+
+    public static string FormatRowCount(int rowCount)
+    {
+        return rowCount == 1 ? "1 fila" : $"{rowCount} filas";
+    }
+
     public static IReadOnlyList<Paso4QuantityInput> ClearQuantities(IReadOnlyList<Paso4QuantityInput> rows)
     {
         return rows
