@@ -25,7 +25,7 @@ public sealed class DuckDbPaso4StockServiceTests
         InsertPersona(connection, "20000000007", "2026-08-06", 7);
         InsertPersonaWithoutImportDate(connection, "20000000008");
 
-        var service = new DuckDbPaso4StockService();
+        var service = CreateStockService(ctx.RootDirectory);
         var overview = service.GetOverview(ctx.DatabasePath);
 
         Assert.Equal(5, overview.AvailableDates.Count);
@@ -50,7 +50,7 @@ public sealed class DuckDbPaso4StockServiceTests
 
         var beforePersonas = Scalar<int>(connection, "SELECT COUNT(*) FROM personas;");
 
-        var service = new DuckDbPaso4StockService();
+        var service = CreateStockService(ctx.RootDirectory);
         var result = service.GenerateOrRegenerateStock(new Paso4GenerateStockRequest(ctx.DatabasePath, DateOnly.Parse("2026-08-10", CultureInfo.InvariantCulture)));
 
         Assert.True(result.IsSuccess, result.FailureMessage);
@@ -70,7 +70,7 @@ public sealed class DuckDbPaso4StockServiceTests
         InsertPersona(connection, "20123456789", "2026-08-10", 10);
         SeedCurrentStockWithPendingToken(connection, DateOnly.Parse("2026-08-10", CultureInfo.InvariantCulture));
 
-        var service = new DuckDbPaso4StockService();
+        var service = CreateStockService(ctx.RootDirectory);
         var result = service.GenerateOrRegenerateStock(new Paso4GenerateStockRequest(ctx.DatabasePath, DateOnly.Parse("2026-08-10", CultureInfo.InvariantCulture)));
 
         Assert.False(result.IsSuccess);
@@ -97,7 +97,7 @@ public sealed class DuckDbPaso4StockServiceTests
             """,
             new DuckDBParameter("id", stockId));
 
-        var service = new DuckDbPaso4StockService();
+        var service = CreateStockService(ctx.RootDirectory);
         var result = service.GenerateOrRegenerateStock(new Paso4GenerateStockRequest(ctx.DatabasePath, DateOnly.Parse("2026-08-10", CultureInfo.InvariantCulture)));
 
         Assert.True(result.IsSuccess, result.FailureMessage);
@@ -118,7 +118,7 @@ public sealed class DuckDbPaso4StockServiceTests
         SeedCompletedRun(connection, latestImportId, "2026-08-10", "2026-08-10 09:00:00", "2026-08-10 09:10:00");
         InsertPersona(connection, "20123456789", "2026-08-10", 10);
 
-        var service = new DuckDbPaso4StockService();
+        var service = CreateStockService(ctx.RootDirectory);
         var generated = service.GenerateOrRegenerateStock(new Paso4GenerateStockRequest(ctx.DatabasePath, DateOnly.Parse("2026-08-10", CultureInfo.InvariantCulture)));
         Assert.True(generated.IsSuccess);
 
@@ -154,7 +154,7 @@ public sealed class DuckDbPaso4StockServiceTests
         InsertPersona(connection, "20987654321", "2026-08-10", null);
         InsertPersona(connection, "20000000001", "2026-08-10", null);
 
-        var service = new DuckDbPaso4StockService();
+        var service = CreateStockService(ctx.RootDirectory);
         var result = service.GenerateOrRegenerateStock(new Paso4GenerateStockRequest(ctx.DatabasePath, DateOnly.Parse("2026-08-10", CultureInfo.InvariantCulture)));
         Assert.True(result.IsSuccess);
         Assert.Equal(2, result.LegacyFallbackAssignedCount);
@@ -184,13 +184,16 @@ public sealed class DuckDbPaso4StockServiceTests
         File.WriteAllText(databasePath, "not a DuckDB database");
         var expectedTechnicalMessage = ReadDuckDbOpenFailure(databasePath);
 
-        var result = new DuckDbPaso4StockService().GenerateOrRegenerateStock(
+        var result = CreateStockService(ctx.RootDirectory).GenerateOrRegenerateStock(
             new Paso4GenerateStockRequest(databasePath, DateOnly.Parse("2026-08-10", CultureInfo.InvariantCulture)));
 
         Assert.Equal(
             $"No se pudo generar el stock. Verificá la base y volvé a intentar. Detalle técnico: {expectedTechnicalMessage}",
             result.FailureMessage);
     }
+
+    private static DuckDbPaso4StockService CreateStockService(string rootDirectory)
+        => new(new Paso4ObraSocialCatalogStore(rootDirectory));
 
     private static List<(string cuil, long order)> QueryRows(DuckDBConnection connection, string sql, params DuckDBParameter[] parameters)
     {

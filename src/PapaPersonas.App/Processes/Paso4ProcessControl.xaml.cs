@@ -22,6 +22,7 @@ public partial class Paso4ProcessControl : System.Windows.Controls.UserControl
     private readonly IPaso4StockService _stockService;
     private readonly IPaso4ExtractionService _extractionService;
     private readonly IPaso4ColumnSelectionStore _columnSelectionStore;
+    private readonly IPaso4ObraSocialCatalogStore _obraSocialCatalogStore;
     private readonly ActivityBuffer _activity = new(maxMessages: 500);
 
     private readonly ObservableCollection<Paso4SummaryRowViewModel> _summaryRows = [];
@@ -35,7 +36,7 @@ public partial class Paso4ProcessControl : System.Windows.Controls.UserControl
     private IReadOnlyList<string> _selectedColumns = Paso4ColumnCatalog.DefaultColumns;
 
     public Paso4ProcessControl()
-        : this(new DuckDbPaso4StockService(), new DuckDbPaso4ExtractionService(), new Paso4ColumnSelectionStore())
+        : this(CreateDefaultServices())
     {
     }
 
@@ -43,10 +44,20 @@ public partial class Paso4ProcessControl : System.Windows.Controls.UserControl
         IPaso4StockService stockService,
         IPaso4ExtractionService extractionService,
         IPaso4ColumnSelectionStore columnSelectionStore)
+        : this(stockService, extractionService, columnSelectionStore, new Paso4ObraSocialCatalogStore())
+    {
+    }
+
+    internal Paso4ProcessControl(
+        IPaso4StockService stockService,
+        IPaso4ExtractionService extractionService,
+        IPaso4ColumnSelectionStore columnSelectionStore,
+        IPaso4ObraSocialCatalogStore obraSocialCatalogStore)
     {
         _stockService = stockService;
         _extractionService = extractionService;
         _columnSelectionStore = columnSelectionStore;
+        _obraSocialCatalogStore = obraSocialCatalogStore;
 
         InitializeComponent();
 
@@ -57,6 +68,29 @@ public partial class Paso4ProcessControl : System.Windows.Controls.UserControl
         LoadColumnSelection();
         RefreshFooterTotals();
         Loaded += async (_, _) => await RefreshAllAsync(showPendingDialog: true);
+    }
+
+    private static (
+        IPaso4StockService StockService,
+        IPaso4ExtractionService ExtractionService,
+        IPaso4ColumnSelectionStore ColumnSelectionStore,
+        IPaso4ObraSocialCatalogStore ObraSocialCatalogStore) CreateDefaultServices()
+    {
+        var catalogStore = new Paso4ObraSocialCatalogStore();
+        return (
+            new DuckDbPaso4StockService(catalogStore),
+            new DuckDbPaso4ExtractionService(),
+            new Paso4ColumnSelectionStore(),
+            catalogStore);
+    }
+
+    private Paso4ProcessControl(
+        (IPaso4StockService StockService,
+         IPaso4ExtractionService ExtractionService,
+         IPaso4ColumnSelectionStore ColumnSelectionStore,
+         IPaso4ObraSocialCatalogStore ObraSocialCatalogStore) services)
+        : this(services.StockService, services.ExtractionService, services.ColumnSelectionStore, services.ObraSocialCatalogStore)
+    {
     }
 
     public void ConfigureCoordinator(ProcessBusyCoordinator coordinator)
@@ -87,6 +121,7 @@ public partial class Paso4ProcessControl : System.Windows.Controls.UserControl
         }
 
         _isRefreshing = true;
+        UpdateControlState();
         try
         {
             if (!TryResolveDatabasePath(out var dbPath))
@@ -146,6 +181,11 @@ public partial class Paso4ProcessControl : System.Windows.Controls.UserControl
         MetricSoldText.Text = $"Vendidos: {summary.Header.SoldMembers}";
         MetricAvailableText.Text = $"Disponibles: {summary.Header.AvailableMembers}";
         MetricGroupsText.Text = $"Grupos OS: {summary.Header.GroupCount}";
+
+        if (summary.CatalogWarnings.Count > 0)
+        {
+            LogInfo("Proceso 4", "Se usaron nombres sugeridos porque el catálogo de obras sociales no es válido.");
+        }
 
         RefreshFooterTotals();
     }
@@ -316,6 +356,35 @@ public partial class Paso4ProcessControl : System.Windows.Controls.UserControl
         _columnSelectionStore.Save(dialog.SelectedColumns);
         LoadColumnSelection();
         LogInfo("Proceso 4", $"Columnas de exportación actualizadas. seleccionadas={_selectedColumns.Count}.");
+    }
+
+    private async void SaveCatalogNames_Click(object sender, RoutedEventArgs e)
+    {
+        if (IsInteractionBlocked() || _overview?.CurrentStock is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var loaded = _obraSocialCatalogStore.Load();
+            var merged = Paso4ObraSocialPresentation.MergeCatalog(
+                loaded.NamesByNormalizedCode,
+                _summaryRows.Select(row => (row.NormalizedCodigoObraSocial, row.ObraSocialDisplay)));
+            _obraSocialCatalogStore.Save(merged);
+            LogInfo("Proceso 4", $"Catálogo de obras sociales actualizado. nombres={merged.Count}.");
+
+            if (TryResolveDatabasePath(out var dbPath))
+            {
+                await LoadSummaryAsync(dbPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowWarning(
+                UserFacingExceptionMessage.WithTechnicalDetail("No se pudieron guardar los nombres de obras sociales.", ex),
+                "Guardar nombres");
+        }
     }
 
     private async void ExportSummary_Click(object sender, RoutedEventArgs e)
@@ -747,6 +816,7 @@ public partial class Paso4ProcessControl : System.Windows.Controls.UserControl
         ExtractSelectionButton.IsEnabled = ui.CanExtract;
         ClearQuantitiesButton.IsEnabled = !busy;
         SelectColumnsButton.IsEnabled = !busy;
+        SaveCatalogNamesButton.IsEnabled = !busy && hasStock;
 
         ExportSummaryButton.IsEnabled = ui.CanReadOnlyExport;
         ExportFullButton.IsEnabled = ui.CanReadOnlyExport;
@@ -754,6 +824,10 @@ public partial class Paso4ProcessControl : System.Windows.Controls.UserControl
 
         CompletedExtractionsComboBox.IsEnabled = !busy;
         ReExportExtractionButton.IsEnabled = !busy && CompletedExtractionsComboBox.SelectedItem is Paso4CompletedExtractionDisplayItem;
+
+        var working = _isLocalBusy || _isRefreshing;
+        Paso4ProgressBar.Visibility = working ? Visibility.Visible : Visibility.Collapsed;
+        Paso4WorkingText.Visibility = working ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void ShowWarning(string message, string title)
@@ -775,6 +849,7 @@ internal sealed class Paso4SummaryRowViewModel : INotifyPropertyChanged
 {
     private readonly Action _onQuantityChanged;
     private string? _quantityText;
+    private string _obraSocialDisplay;
 
     public Paso4SummaryRowViewModel(Paso4StockGroupSummaryRow row, Action onQuantityChanged)
     {
@@ -783,7 +858,7 @@ internal sealed class Paso4SummaryRowViewModel : INotifyPropertyChanged
         NormalizedCodigoObraSocial = row.NormalizedCodigoObraSocial;
         NormalizedObraSocial = row.NormalizedObraSocial;
         CodigoObraSocialDisplay = Paso4ProcessUiLogic.ToDisplayValue(row.NormalizedCodigoObraSocial);
-        ObraSocialDisplay = Paso4ProcessUiLogic.ToDisplayValue(row.NormalizedObraSocial);
+        _obraSocialDisplay = Paso4ObraSocialPresentation.ToEditableDisplayName(row.NormalizedObraSocial);
         Total = row.Total;
         Sold = row.Sold;
         Available = row.Available;
@@ -796,10 +871,25 @@ internal sealed class Paso4SummaryRowViewModel : INotifyPropertyChanged
     public string NormalizedCodigoObraSocial { get; }
     public string NormalizedObraSocial { get; }
     public string CodigoObraSocialDisplay { get; }
-    public string ObraSocialDisplay { get; }
     public int Total { get; }
     public int Sold { get; }
     public int Available { get; }
+
+    public string ObraSocialDisplay
+    {
+        get => _obraSocialDisplay;
+        set
+        {
+            var normalized = value ?? string.Empty;
+            if (string.Equals(_obraSocialDisplay, normalized, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _obraSocialDisplay = normalized;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ObraSocialDisplay)));
+        }
+    }
 
     public string? QuantityText
     {

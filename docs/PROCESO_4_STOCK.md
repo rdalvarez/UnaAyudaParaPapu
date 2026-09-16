@@ -6,7 +6,7 @@ Este proceso permite operar un stock de trabajo derivado de `personas`, sin borr
 
 - Generar/regenerar un **stock actual** desde una `fecha_importacion` de `personas`.
 - Exportar ese stock en CSV (resumen o completo).
-- Ejecutar extracciones por grupos (obra social/código) con confirmación y semántica todo-o-nada.
+- Ejecutar extracciones por grupos (código de obra social) con confirmación y semántica todo-o-nada.
 - Recuperar una extracción pendiente por token (reintentar o cancelar).
 - Reexportar extracciones completadas del stock vigente.
 
@@ -49,7 +49,8 @@ Regla importante:
 
 ### 1) Exportar resumen
 
-- Salida agregada por grupo (obra social/código).
+- Salida agregada **sólo por código de obra social normalizado**.
+- El nombre mostrado sale del catálogo JSON o, si falta, de una sugerencia determinista (el más frecuente; empate alfabético).
 - Incluye totales, vendidos y disponibles.
 - No contiene detalle fila a fila de personas.
 
@@ -71,10 +72,22 @@ Regla importante:
 - Si el JSON es inválido o incompleto, se aplican columnas por defecto.
 - Las columnas obligatorias no se pueden desactivar.
 
+## Catálogo de nombres de obra social
+
+- Ubicación: `%LOCALAPPDATA%\PapaPersonas\config\paso4-obras-sociales.json`.
+- Agrupa el resumen y la extracción **sólo por `codigo_obra_social` normalizado**. El nombre importado no parte grupos.
+- El catálogo guarda un nombre de presentación estático por código. Afecta la grilla de Paso 4 y el CSV de resumen.
+- Los CSV de detalle (stock completo, extracción y reexportación) conservan el `obra_social` original de cada fila.
+- Si el JSON falta o es válido pero incompleto, el resumen siembra automáticamente sólo los códigos faltantes con una sugerencia determinista (el más frecuente; empate alfabético) y guarda esas entradas nuevas. Los nombres ya catalogados no se pisan.
+- Si el JSON es inválido, se usan nombres sugeridos en memoria y no se sobrescribe el archivo.
+- Si un código no tiene ningún nombre no vacío, se muestra `(Vacío)` y no se persiste un nombre inválido.
+- Un catálogo completo no se reescribe al volver a abrir el resumen.
+- En la grilla se puede editar el nombre y persistirlo con **Guardar nombres**.
+
 ## Extracción multi-grupo (todo o nada)
 
-- La solicitud valida disponibilidad por grupo antes de confirmar.
-- Si un grupo no alcanza la cantidad pedida, la operación se rechaza.
+- La solicitud valida disponibilidad **por código** antes de confirmar; variantes de nombre del mismo código se suman al mismo cupo.
+- Si un código no alcanza la cantidad pedida, la operación se rechaza.
 - La reserva se hace por token; la finalización exige concordancia de metadatos pendientes (validación CAS).
 - Resultado esperado: o se completa toda la extracción, o no se confirma ninguna venta parcial.
 

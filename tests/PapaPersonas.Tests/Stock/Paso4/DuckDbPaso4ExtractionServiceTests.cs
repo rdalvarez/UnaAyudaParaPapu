@@ -116,6 +116,35 @@ public sealed class DuckDbPaso4ExtractionServiceTests
     }
 
     [Fact]
+    public void PreflightExtraction_PoolsAvailabilityByNormalizedCode_AcrossNameVariants()
+    {
+        using var ctx = CreateDbContext();
+        using var connection = OpenConnection(ctx.DatabasePath);
+        SeedStockWithNameVariants(connection);
+
+        var service = new DuckDbPaso4ExtractionService();
+        var ready = service.PreflightExtraction(
+            ctx.DatabasePath,
+            [new Paso4ExtractionGroupQuantityRequest("OS1", "PLAN A", 3)]);
+        var insufficient = service.PreflightExtraction(
+            ctx.DatabasePath,
+            [new Paso4ExtractionGroupQuantityRequest("OS1", "PLAN B", 4)]);
+        var duplicateByCode = service.PreflightExtraction(
+            ctx.DatabasePath,
+            [
+                new Paso4ExtractionGroupQuantityRequest("OS1", "PLAN A", 1),
+                new Paso4ExtractionGroupQuantityRequest("OS1", "PLAN B", 1)
+            ]);
+
+        Assert.Equal(Paso4ExtractionPreflightStatus.Ready, ready.Status);
+        Assert.Equal(Paso4ExtractionPreflightStatus.InsufficientStock, insufficient.Status);
+        Assert.Equal("OS1", insufficient.NormalizedCodigoObraSocial);
+        Assert.Equal(4, insufficient.RequestedQuantity);
+        Assert.Equal(3, insufficient.AvailableQuantity);
+        Assert.Equal(Paso4ExtractionPreflightStatus.InvalidRequest, duplicateByCode.Status);
+    }
+
+    [Fact]
     public void PreflightExtraction_ReturnsPending_NoStock_Duplicate_Invalid_AndGroupNotFound()
     {
         using var ctx = CreateDbContext();
@@ -219,6 +248,46 @@ public sealed class DuckDbPaso4ExtractionServiceTests
         Assert.Equal("CUIL,APELLIDO,CODIGOOS,OBRASOCIAL,FECHA_CARGA", lines[0]);
         Assert.StartsWith("20000000001", lines[1], StringComparison.Ordinal);
         Assert.StartsWith("20999999999", lines[2], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task BeginExtraction_PoolsNameVariantsByCode_PreservesRawNames_AndRejectsOverPooledQuantity()
+    {
+        using var ctx = CreateDbContext();
+        using var connection = OpenConnection(ctx.DatabasePath);
+        SeedStockWithNameVariants(connection);
+
+        var service = new DuckDbPaso4ExtractionService();
+        var overflowPath = Path.Combine(ctx.RootDirectory, "extract-overflow.csv");
+        var overflow = await service.BeginExtractionAsync(
+            new Paso4BeginExtractionRequest(
+                ctx.DatabasePath,
+                overflowPath,
+                ["APELLIDO"],
+                [new Paso4ExtractionGroupQuantityRequest("OS1", "PLAN A", 4)]),
+            CancellationToken.None);
+
+        Assert.False(overflow.IsSuccess);
+        Assert.False(File.Exists(overflowPath));
+        Assert.Equal(0, Scalar<int>(connection, "SELECT COUNT(*) FROM stock_members WHERE extraction_token IS NOT NULL;"));
+
+        var output = Path.Combine(ctx.RootDirectory, "extract-pooled.csv");
+        var result = await service.BeginExtractionAsync(
+            new Paso4BeginExtractionRequest(
+                ctx.DatabasePath,
+                output,
+                ["APELLIDO"],
+                [new Paso4ExtractionGroupQuantityRequest("OS1", "NOMBRE CATALOGO", 3)]),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.FailureMessage);
+        Assert.Equal(3, result.ExportedRows);
+        var lines = await File.ReadAllLinesAsync(output);
+        Assert.Equal("CUIL,APELLIDO,CODIGOOS,OBRASOCIAL,FECHA_CARGA", lines[0]);
+        Assert.Contains("20123456789,A,OS1,Plan A", lines[1]);
+        Assert.Contains("20987654321,B,OS1,Plan B", lines[2]);
+        Assert.Contains("20000000001,C, os1 ,Plan A", lines[3]);
+        Assert.Equal(0, Scalar<int>(connection, "SELECT COUNT(*) FROM stock_members WHERE codigo_obra_social = 'OS2' AND vendido = TRUE;"));
     }
 
     [Fact]
@@ -410,7 +479,7 @@ public sealed class DuckDbPaso4ExtractionServiceTests
             WHERE cuil = '20123456789';
             """);
 
-        var stockService = new DuckDbPaso4StockService();
+        var stockService = new DuckDbPaso4StockService(new Paso4ObraSocialCatalogStore(ctx.RootDirectory));
         var regen = stockService.GenerateOrRegenerateStock(new Paso4GenerateStockRequest(ctx.DatabasePath, DateOnly.Parse("2026-08-10", CultureInfo.InvariantCulture)));
         Assert.True(regen.IsSuccess, regen.FailureMessage);
 
@@ -547,6 +616,30 @@ public sealed class DuckDbPaso4ExtractionServiceTests
         var directory = Path.GetDirectoryName(destinationPath)!;
         var fileName = Path.GetFileName(destinationPath);
         return Path.Combine(directory, $".{fileName}.token-{token:N}.tmp");
+    }
+
+    private static void SeedStockWithNameVariants(DuckDBConnection connection)
+    {
+        ExecuteNonQuery(
+            connection,
+            """
+            INSERT INTO stock_headers (stock_id, source_fecha_importacion, generated_utc)
+            VALUES ('11111111-1111-1111-1111-111111111111', DATE '2026-08-10', CURRENT_TIMESTAMP);
+
+            INSERT INTO personas (cuil, apellido, fecha_actualizacion)
+            VALUES
+                ('20123456789', 'A', CURRENT_TIMESTAMP),
+                ('20987654321', 'B', CURRENT_TIMESTAMP),
+                ('20000000001', 'C', CURRENT_TIMESTAMP),
+                ('20000000002', 'D', CURRENT_TIMESTAMP);
+
+            INSERT INTO stock_members (stock_id, cuil, codigo_obra_social, obra_social, source_order, vendido, fecha_venta)
+            VALUES
+              ('11111111-1111-1111-1111-111111111111', '20123456789', 'OS1', 'Plan A', 1, FALSE, NULL),
+              ('11111111-1111-1111-1111-111111111111', '20987654321', 'OS1', 'Plan B', 2, FALSE, NULL),
+              ('11111111-1111-1111-1111-111111111111', '20000000001', ' os1 ', 'Plan A', 3, FALSE, NULL),
+              ('11111111-1111-1111-1111-111111111111', '20000000002', 'OS2', 'Plan C', 4, FALSE, NULL);
+            """);
     }
 
     private static void SeedStockForExtraction(DuckDBConnection connection)

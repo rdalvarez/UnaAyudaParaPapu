@@ -55,7 +55,7 @@ public sealed class DuckDbPaso4ExtractionService : IPaso4ExtractionService
             var availability = QueryAvailableByGroup(connection, tx, stock.Value.StockId);
             foreach (var group in validation.NormalizedRequests)
             {
-                if (!availability.TryGetValue((group.NormalizedCodigoObraSocial, group.NormalizedObraSocial), out var available))
+                if (!availability.TryGetValue(group.NormalizedCodigoObraSocial, out var available))
                 {
                     tx.Rollback();
                     return Paso4ExtractionPreflightResult.GroupNotFound(
@@ -125,7 +125,7 @@ public sealed class DuckDbPaso4ExtractionService : IPaso4ExtractionService
             var availability = QueryAvailableByGroup(connection, tx, currentStock.StockId);
             foreach (var group in validation.NormalizedRequests)
             {
-                if (!availability.TryGetValue((group.NormalizedCodigoObraSocial, group.NormalizedObraSocial), out var count) || count < group.Quantity)
+                if (!availability.TryGetValue(group.NormalizedCodigoObraSocial, out var count) || count < group.Quantity)
                 {
                     tx.Rollback();
                     return Paso4BeginExtractionResult.ValidationFailed("El grupo solicitado no tiene suficientes personas disponibles.");
@@ -653,10 +653,9 @@ public sealed class DuckDbPaso4ExtractionService : IPaso4ExtractionService
                 WHERE stock_id = $stockId
                   AND vendido = FALSE
                   AND extraction_token IS NULL
-                  AND UPPER(TRIM(COALESCE(codigo_obra_social, ''))) = $normCodigo
-                  AND UPPER(TRIM(COALESCE(obra_social, ''))) = $normObra
-                ORDER BY source_order ASC, cuil ASC
-                LIMIT $qty
+                   AND UPPER(TRIM(COALESCE(codigo_obra_social, ''))) = $normCodigo
+                 ORDER BY source_order ASC, cuil ASC
+                 LIMIT $qty
             ) AS picked
             WHERE sm.stock_id = $stockId
               AND sm.cuil = picked.cuil
@@ -666,11 +665,10 @@ public sealed class DuckDbPaso4ExtractionService : IPaso4ExtractionService
             new DuckDBParameter("token", token),
             new DuckDBParameter("stockId", stockId),
             new DuckDBParameter("normCodigo", group.NormalizedCodigoObraSocial),
-            new DuckDBParameter("normObra", group.NormalizedObraSocial),
             new DuckDBParameter("qty", group.Quantity));
     }
 
-    private static Dictionary<(string Codigo, string Obra), int> QueryAvailableByGroup(DuckDBConnection connection, System.Data.Common.DbTransaction tx, Guid stockId)
+    private static Dictionary<string, int> QueryAvailableByGroup(DuckDBConnection connection, System.Data.Common.DbTransaction tx, Guid stockId)
     {
         using var command = connection.CreateCommand();
         command.Transaction = tx;
@@ -678,21 +676,20 @@ public sealed class DuckDbPaso4ExtractionService : IPaso4ExtractionService
             """
             SELECT
                 UPPER(TRIM(COALESCE(codigo_obra_social, ''))) AS norm_codigo,
-                UPPER(TRIM(COALESCE(obra_social, ''))) AS norm_obra,
                 COUNT(*)
             FROM stock_members
             WHERE stock_id = $stockId
               AND vendido = FALSE
               AND extraction_token IS NULL
-            GROUP BY 1, 2;
+            GROUP BY 1;
             """;
         command.Parameters.Add(new DuckDBParameter("stockId", stockId));
 
         using var reader = command.ExecuteReader();
-        var map = new Dictionary<(string Codigo, string Obra), int>();
+        var map = new Dictionary<string, int>(StringComparer.Ordinal);
         while (reader.Read())
         {
-            map[(reader.GetString(0), reader.GetString(1))] = reader.GetInt32(2);
+            map[reader.GetString(0)] = reader.GetInt32(1);
         }
 
         return map;
@@ -718,8 +715,7 @@ public sealed class DuckDbPaso4ExtractionService : IPaso4ExtractionService
 
             var code = NormalizeGroupValue(request.NormalizedCodigoObraSocial);
             var desc = NormalizeGroupValue(request.NormalizedObraSocial);
-            var key = $"{code}|||{desc}";
-            if (!seen.Add(key))
+            if (!seen.Add(code))
             {
                 return (false, "No se permiten grupos normalizados duplicados.", []);
             }

@@ -31,13 +31,14 @@ public sealed class DuckDbPaso4StockExportTests
             """,
             new DuckDBParameter("stockId", stockId));
 
-        var service = new DuckDbPaso4StockService();
+        var service = CreateStockService(ctx.RootDirectory);
         var summary = service.GetCurrentStockSummary(ctx.DatabasePath);
 
         Assert.Equal(4, summary.Header.TotalMembers);
         Assert.Equal(1, summary.Header.SoldMembers);
         Assert.Equal(3, summary.Header.AvailableMembers);
         Assert.Equal(3, summary.Header.GroupCount);
+        Assert.Empty(summary.CatalogWarnings);
 
         Assert.Equal(1, summary.Groups[0].Orden);
         Assert.Equal("OS1", summary.Groups[0].NormalizedCodigoObraSocial);
@@ -59,6 +60,235 @@ public sealed class DuckDbPaso4StockExportTests
         var lines = await File.ReadAllLinesAsync(output);
         Assert.Equal("ORDEN,COD_O_SOCIAL,DESCRIPCION_O_SOCIAL,CANTIDAD,CANTIDAD_VENDIDA,CANTIDAD_DISPONIBLE,FECHA_CARGA", lines[0]);
         Assert.StartsWith("1,OS1,PLAN A,2,1,1,2026-08-10", lines[1], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetSummary_MergesSameNormalizedCode_AndUsesDeterministicFallbackName()
+    {
+        using var ctx = CreateDbContext();
+        using var connection = OpenConnection(ctx.DatabasePath);
+
+        var stockId = Guid.NewGuid();
+        ExecuteNonQuery(
+            connection,
+            """
+            INSERT INTO stock_headers (stock_id, source_fecha_importacion, generated_utc)
+            VALUES ($stockId, DATE '2026-08-10', CURRENT_TIMESTAMP);
+
+            INSERT INTO stock_members (stock_id, cuil, codigo_obra_social, obra_social, source_order, vendido, fecha_venta)
+            VALUES
+                ($stockId, '201', ' os1 ', 'Plan B', 1, FALSE, NULL),
+                ($stockId, '202', 'OS1', 'Plan A', 2, TRUE, CURRENT_TIMESTAMP),
+                ($stockId, '203', 'OS1', 'Plan A', 3, FALSE, NULL),
+                ($stockId, '204', ' os1 ', 'Plan C', 4, FALSE, NULL),
+                ($stockId, '205', '', 'Nombre suelto', 5, FALSE, NULL),
+                ($stockId, '206', '   ', NULL, 6, FALSE, NULL);
+            """,
+            new DuckDBParameter("stockId", stockId));
+
+        var service = CreateStockService(ctx.RootDirectory);
+        var summary = service.GetCurrentStockSummary(ctx.DatabasePath);
+
+        Assert.Equal(2, summary.Header.GroupCount);
+        Assert.Equal("OS1", summary.Groups[0].NormalizedCodigoObraSocial);
+        Assert.Equal("Plan A", summary.Groups[0].NormalizedObraSocial);
+        Assert.Equal(4, summary.Groups[0].Total);
+        Assert.Equal(1, summary.Groups[0].Sold);
+        Assert.Equal(3, summary.Groups[0].Available);
+
+        Assert.Equal("", summary.Groups[1].NormalizedCodigoObraSocial);
+        Assert.Equal("Nombre suelto", summary.Groups[1].NormalizedObraSocial);
+        Assert.Equal(2, summary.Groups[1].Total);
+
+        var output = Path.Combine(ctx.RootDirectory, "summary-merged.csv");
+        var exportResult = await service.ExportSummaryCsvAsync(
+            new Paso4SummaryExportRequest(ctx.DatabasePath, output),
+            CancellationToken.None);
+
+        Assert.True(exportResult.IsSuccess, exportResult.FailureMessage);
+        var lines = await File.ReadAllLinesAsync(output);
+        Assert.Equal("1,OS1,Plan A,4,1,3,2026-08-10", lines[1]);
+        Assert.Equal("2,,Nombre suelto,2,0,2,2026-08-10", lines[2]);
+    }
+
+    [Fact]
+    public async Task GetSummary_UsesCatalogOverride_AndKeepsRawNamesInFullExport()
+    {
+        using var ctx = CreateDbContext();
+        using var connection = OpenConnection(ctx.DatabasePath);
+
+        var stockId = Guid.NewGuid();
+        ExecuteNonQuery(
+            connection,
+            """
+            INSERT INTO stock_headers (stock_id, source_fecha_importacion, generated_utc)
+            VALUES ($stockId, DATE '2026-08-10', CURRENT_TIMESTAMP);
+
+            INSERT INTO stock_members (stock_id, cuil, codigo_obra_social, obra_social, source_order, vendido, fecha_venta)
+            VALUES
+                ($stockId, '20123456789', 'OS1', 'Plan A', 1, FALSE, NULL),
+                ($stockId, '20987654321', 'OS1', 'Plan B', 2, FALSE, NULL);
+            """,
+            new DuckDBParameter("stockId", stockId));
+
+        var catalog = new Paso4ObraSocialCatalogStore(ctx.RootDirectory);
+        catalog.Save(new Dictionary<string, string> { ["OS1"] = "Obra Unificada" });
+        var service = new DuckDbPaso4StockService(catalog);
+
+        var summary = service.GetCurrentStockSummary(ctx.DatabasePath);
+        Assert.Equal("Obra Unificada", summary.Groups[0].NormalizedObraSocial);
+
+        var summaryPath = Path.Combine(ctx.RootDirectory, "summary-catalog.csv");
+        var summaryExport = await service.ExportSummaryCsvAsync(
+            new Paso4SummaryExportRequest(ctx.DatabasePath, summaryPath),
+            CancellationToken.None);
+        Assert.True(summaryExport.IsSuccess, summaryExport.FailureMessage);
+        var summaryLines = await File.ReadAllLinesAsync(summaryPath);
+        Assert.Equal("1,OS1,Obra Unificada,2,0,2,2026-08-10", summaryLines[1]);
+
+        var fullPath = Path.Combine(ctx.RootDirectory, "full-raw.csv");
+        var fullExport = await service.ExportFullCsvAsync(
+            new Paso4FullExportRequest(ctx.DatabasePath, fullPath, OnlyAvailable: true, SelectedColumns: ["APELLIDO"]),
+            CancellationToken.None);
+        Assert.True(fullExport.IsSuccess, fullExport.FailureMessage);
+        var fullLines = await File.ReadAllLinesAsync(fullPath);
+        Assert.Contains("20123456789,,OS1,Plan A", fullLines[1]);
+        Assert.Contains("20987654321,,OS1,Plan B", fullLines[2]);
+    }
+
+    [Fact]
+    public void GetSummary_WhenCatalogCorrupt_UsesSuggestedNameAndWarning()
+    {
+        using var ctx = CreateDbContext();
+        using var connection = OpenConnection(ctx.DatabasePath);
+
+        var stockId = Guid.NewGuid();
+        ExecuteNonQuery(
+            connection,
+            """
+            INSERT INTO stock_headers (stock_id, source_fecha_importacion, generated_utc)
+            VALUES ($stockId, DATE '2026-08-10', CURRENT_TIMESTAMP);
+
+            INSERT INTO stock_members (stock_id, cuil, codigo_obra_social, obra_social, source_order, vendido, fecha_venta)
+            VALUES ($stockId, '201', 'OS1', 'Plan A', 1, FALSE, NULL);
+            """,
+            new DuckDBParameter("stockId", stockId));
+
+        Directory.CreateDirectory(Path.Combine(ctx.RootDirectory, "config"));
+        File.WriteAllText(Path.Combine(ctx.RootDirectory, "config", "paso4-obras-sociales.json"), "{bad json");
+
+        var summary = CreateStockService(ctx.RootDirectory).GetCurrentStockSummary(ctx.DatabasePath);
+
+        Assert.Equal("Plan A", summary.Groups[0].NormalizedObraSocial);
+        Assert.NotEmpty(summary.CatalogWarnings);
+        Assert.Equal("{bad json", File.ReadAllText(Path.Combine(ctx.RootDirectory, "config", "paso4-obras-sociales.json")));
+    }
+
+    [Fact]
+    public void GetSummary_WhenCatalogMissing_CreatesCatalogWithSuggestedNames()
+    {
+        using var ctx = CreateDbContext();
+        using var connection = OpenConnection(ctx.DatabasePath);
+        SeedMembers(
+            connection,
+            ("201", "OS1", "Plan B", false),
+            ("202", "OS1", "Plan A", true),
+            ("203", "OS1", "Plan A", false),
+            ("204", "OS1", "Plan C", false));
+
+        var catalogPath = CatalogPath(ctx.RootDirectory);
+        Assert.False(File.Exists(catalogPath));
+
+        var summary = CreateStockService(ctx.RootDirectory).GetCurrentStockSummary(ctx.DatabasePath);
+
+        Assert.Equal("Plan A", summary.Groups[0].NormalizedObraSocial);
+        Assert.True(File.Exists(catalogPath));
+        var loaded = new Paso4ObraSocialCatalogStore(ctx.RootDirectory).Load();
+        Assert.Equal("Plan A", loaded.NamesByNormalizedCode["OS1"]);
+        Assert.Empty(loaded.Warnings);
+    }
+
+    [Fact]
+    public void GetSummary_UsesAlphabeticalTieBreakForSuggestedName()
+    {
+        using var ctx = CreateDbContext();
+        using var connection = OpenConnection(ctx.DatabasePath);
+        SeedMembers(
+            connection,
+            ("201", "OS1", "Plan B", false),
+            ("202", "OS1", "Plan A", false));
+
+        var summary = CreateStockService(ctx.RootDirectory).GetCurrentStockSummary(ctx.DatabasePath);
+
+        Assert.Equal("Plan A", summary.Groups[0].NormalizedObraSocial);
+        Assert.Equal("Plan A", new Paso4ObraSocialCatalogStore(ctx.RootDirectory).Load().NamesByNormalizedCode["OS1"]);
+    }
+
+    [Fact]
+    public void GetSummary_WhenCatalogValidButIncomplete_AddsOnlyMissingCodes()
+    {
+        using var ctx = CreateDbContext();
+        using var connection = OpenConnection(ctx.DatabasePath);
+        SeedMembers(
+            connection,
+            ("201", "OS1", "Plan A", false),
+            ("202", "OS2", "Plan Z", false),
+            ("203", "OS2", "Plan Y", false));
+
+        var store = new Paso4ObraSocialCatalogStore(ctx.RootDirectory);
+        store.Save(new Dictionary<string, string> { ["OS1"] = "Keep Me" });
+        var counting = new CountingCatalogStore(store);
+
+        var summary = new DuckDbPaso4StockService(counting).GetCurrentStockSummary(ctx.DatabasePath);
+        var loaded = store.Load();
+
+        Assert.Equal(1, counting.SaveCount);
+        Assert.Equal("Keep Me", summary.Groups[0].NormalizedObraSocial);
+        Assert.Equal("Plan Y", summary.Groups[1].NormalizedObraSocial);
+        Assert.Equal("Keep Me", loaded.NamesByNormalizedCode["OS1"]);
+        Assert.Equal("Plan Y", loaded.NamesByNormalizedCode["OS2"]);
+        Assert.Equal(2, loaded.NamesByNormalizedCode.Count);
+    }
+
+    [Fact]
+    public void GetSummary_WhenCatalogComplete_DoesNotRewriteCatalog()
+    {
+        using var ctx = CreateDbContext();
+        using var connection = OpenConnection(ctx.DatabasePath);
+        SeedMembers(
+            connection,
+            ("201", "OS1", "Plan A", false),
+            ("202", "OS1", "Plan B", false));
+
+        var store = new Paso4ObraSocialCatalogStore(ctx.RootDirectory);
+        store.Save(new Dictionary<string, string> { ["OS1"] = "Catalogada" });
+        var counting = new CountingCatalogStore(store);
+        var service = new DuckDbPaso4StockService(counting);
+
+        var first = service.GetCurrentStockSummary(ctx.DatabasePath);
+        var second = service.GetCurrentStockSummary(ctx.DatabasePath);
+
+        Assert.Equal(0, counting.SaveCount);
+        Assert.Equal("Catalogada", first.Groups[0].NormalizedObraSocial);
+        Assert.Equal("Catalogada", second.Groups[0].NormalizedObraSocial);
+        Assert.Equal("Catalogada", store.Load().NamesByNormalizedCode["OS1"]);
+    }
+
+    [Fact]
+    public void GetSummary_WhenCandidateIsBlank_DoesNotPersistName()
+    {
+        using var ctx = CreateDbContext();
+        using var connection = OpenConnection(ctx.DatabasePath);
+        SeedMembers(
+            connection,
+            ("201", "OS1", "", false),
+            ("202", "OS1", "   ", false),
+            ("203", "OS1", null, false));
+
+        var summary = CreateStockService(ctx.RootDirectory).GetCurrentStockSummary(ctx.DatabasePath);
+
+        Assert.Equal("", summary.Groups[0].NormalizedObraSocial);
+        Assert.False(File.Exists(CatalogPath(ctx.RootDirectory)));
     }
 
     [Fact]
@@ -86,7 +316,7 @@ public sealed class DuckDbPaso4StockExportTests
             """,
             new DuckDBParameter("stockId", stockId));
 
-        var service = new DuckDbPaso4StockService();
+        var service = CreateStockService(ctx.RootDirectory);
         var outputAll = Path.Combine(ctx.RootDirectory, "full-all.csv");
         var outputAvailable = Path.Combine(ctx.RootDirectory, "full-available.csv");
 
@@ -150,7 +380,7 @@ public sealed class DuckDbPaso4StockExportTests
             """,
             new DuckDBParameter("stockId", stockId));
 
-        var service = new DuckDbPaso4StockService();
+        var service = CreateStockService(ctx.RootDirectory);
         var output = Path.Combine(ctx.RootDirectory, "full-all-business.csv");
 
         var result = await service.ExportFullCsvAsync(
@@ -223,7 +453,7 @@ public sealed class DuckDbPaso4StockExportTests
             """,
             new DuckDBParameter("stockId", stockId));
 
-        var service = new DuckDbPaso4StockService();
+        var service = CreateStockService(ctx.RootDirectory);
         var output = Path.Combine(ctx.RootDirectory, "full-default.csv");
         var result = await service.ExportFullCsvAsync(
             new Paso4FullExportRequest(ctx.DatabasePath, output, OnlyAvailable: true, SelectedColumns: []),
@@ -241,7 +471,7 @@ public sealed class DuckDbPaso4StockExportTests
         var databasePath = Path.Combine(ctx.RootDirectory, "invalid.duckdb");
         File.WriteAllText(databasePath, "not a DuckDB database");
         var expectedTechnicalMessage = ReadDuckDbOpenFailure(databasePath);
-        var service = new DuckDbPaso4StockService();
+        var service = CreateStockService(ctx.RootDirectory);
 
         var summary = await service.ExportSummaryCsvAsync(
             new Paso4SummaryExportRequest(databasePath, Path.Combine(ctx.RootDirectory, "summary.csv")),
@@ -256,6 +486,48 @@ public sealed class DuckDbPaso4StockExportTests
         Assert.Equal(
             $"No se pudo exportar el stock completo. Detalle técnico: {expectedTechnicalMessage}",
             full.FailureMessage);
+    }
+
+    private static DuckDbPaso4StockService CreateStockService(string rootDirectory)
+        => new(new Paso4ObraSocialCatalogStore(rootDirectory));
+
+    private static string CatalogPath(string rootDirectory)
+        => Path.Combine(rootDirectory, "config", "paso4-obras-sociales.json");
+
+    private static void SeedMembers(
+        DuckDBConnection connection,
+        params (string Cuil, string Codigo, string? ObraSocial, bool Sold)[] members)
+    {
+        var stockId = Guid.NewGuid();
+        ExecuteNonQuery(
+            connection,
+            """
+            INSERT INTO stock_headers (stock_id, source_fecha_importacion, generated_utc)
+            VALUES ($stockId, DATE '2026-08-10', CURRENT_TIMESTAMP);
+            """,
+            new DuckDBParameter("stockId", stockId));
+
+        var order = 1;
+        foreach (var member in members)
+        {
+            ExecuteNonQuery(
+                connection,
+                member.Sold
+                    ? """
+                      INSERT INTO stock_members (stock_id, cuil, codigo_obra_social, obra_social, source_order, vendido, fecha_venta)
+                      VALUES ($stockId, $cuil, $codigo, $obra, $order, TRUE, CURRENT_TIMESTAMP);
+                      """
+                    : """
+                      INSERT INTO stock_members (stock_id, cuil, codigo_obra_social, obra_social, source_order, vendido, fecha_venta)
+                      VALUES ($stockId, $cuil, $codigo, $obra, $order, FALSE, NULL);
+                      """,
+                new DuckDBParameter("stockId", stockId),
+                new DuckDBParameter("cuil", member.Cuil),
+                new DuckDBParameter("codigo", member.Codigo),
+                new DuckDBParameter("obra", (object?)member.ObraSocial ?? DBNull.Value),
+                new DuckDBParameter("order", order));
+            order++;
+        }
     }
 
     private static TestDbContext CreateDbContext()
@@ -315,6 +587,27 @@ public sealed class DuckDbPaso4StockExportTests
             {
                 Directory.Delete(RootDirectory, recursive: true);
             }
+        }
+    }
+
+    private sealed class CountingCatalogStore : IPaso4ObraSocialCatalogStore
+    {
+        private readonly IPaso4ObraSocialCatalogStore _inner;
+
+        public CountingCatalogStore(IPaso4ObraSocialCatalogStore inner)
+        {
+            _inner = inner;
+        }
+
+        public int SaveCount { get; private set; }
+
+        public Paso4ObraSocialCatalogState Load()
+            => _inner.Load();
+
+        public void Save(IReadOnlyDictionary<string, string> namesByNormalizedCode)
+        {
+            SaveCount++;
+            _inner.Save(namesByNormalizedCode);
         }
     }
 }

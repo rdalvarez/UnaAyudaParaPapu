@@ -53,7 +53,18 @@
                     </StackPanel>
                 </Grid>
 
-                <Border Grid.Row="2" Margin="0,8,0,0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFF9F9F9">
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="170" />
+                        <ColumnDefinition Width="230" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="Paso4WorkingText" Grid.Column="0" Margin="0,6,0,0" VerticalAlignment="Center" FontWeight="SemiBold" Text="Trabajando..." Visibility="Collapsed" />
+                    <ProgressBar x:Name="Paso4ProgressBar" Grid.Column="1" Margin="8,6,0,0" Height="14" IsIndeterminate="True" Visibility="Collapsed" />
+                </Grid>
+
+                <Border Grid.Row="3" Margin="0,8,0,0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFF9F9F9">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -68,14 +79,15 @@
                     </Grid>
                 </Border>
 
-                <TextBlock x:Name="DateWarningText" Grid.Row="3" Margin="0,8,0,0" Foreground="#FFB45F06" TextWrapping="Wrap" Visibility="Collapsed" />
+                <TextBlock x:Name="DateWarningText" Grid.Row="4" Margin="0,8,0,0" Foreground="#FFB45F06" TextWrapping="Wrap" Visibility="Collapsed" />
 
-                <Border Grid.Row="4" Margin="0,10,0,0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFFDFDFD">
+                <Border Grid.Row="5" Margin="0,10,0,0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFFDFDFD">
                     <StackPanel>
                         <TextBlock FontWeight="SemiBold" Text="Preparación y exportaciones" />
                         <WrapPanel Margin="0,8,0,0" Orientation="Horizontal" ItemHeight="34">
                             <Button x:Name="GenerateStockButton" Width="180" Margin="0,0,8,8" Content="Generar stock" Click="GenerateStock_Click" />
                             <Button x:Name="SelectColumnsButton" Width="180" Margin="0,0,8,8" Content="Seleccionar columnas" Click="SelectColumns_Click" />
+                            <Button x:Name="SaveCatalogNamesButton" Width="180" Margin="0,0,8,8" Content="Guardar nombres" Click="SaveCatalogNames_Click" />
                             <Button x:Name="ExportSummaryButton" Width="180" Margin="0,0,8,8" Content="Exportar resumen" Click="ExportSummary_Click" />
                             <StackPanel Orientation="Horizontal" Margin="0,0,8,8" VerticalAlignment="Center">
                                 <Button x:Name="ExportFullButton" Width="180" Content="Exportar stock completo" Click="ExportFull_Click" />
@@ -85,7 +97,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Row="5" Margin="0,10,0,0" Padding="8" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFFDFDFD">
+                <Border Grid.Row="6" Margin="0,10,0,0" Padding="8" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFFDFDFD">
                     <DataGrid x:Name="SummaryGrid"
                               AutoGenerateColumns="False"
                               CanUserAddRows="False"
@@ -95,7 +107,7 @@
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="ORDEN" Binding="{Binding Orden}" IsReadOnly="True" Width="80" />
                             <DataGridTextColumn Header="COD_O_SOCIAL" Binding="{Binding CodigoObraSocialDisplay}" IsReadOnly="True" Width="150" />
-                            <DataGridTextColumn Header="DESCRIPCIÓN_O_SOCIAL" Binding="{Binding ObraSocialDisplay}" IsReadOnly="True" Width="*" MinWidth="220" />
+                            <DataGridTextColumn Header="DESCRIPCIÓN_O_SOCIAL" Binding="{Binding ObraSocialDisplay, UpdateSourceTrigger=PropertyChanged}" Width="*" MinWidth="220" />
                             <DataGridTextColumn Header="TOTAL" Binding="{Binding Total}" IsReadOnly="True" Width="90" />
                             <DataGridTextColumn Header="VENDIDOS" Binding="{Binding Sold}" IsReadOnly="True" Width="90" />
                             <DataGridTextColumn Header="DISPONIBLES" Binding="{Binding Available}" IsReadOnly="True" Width="110" />
@@ -104,7 +116,7 @@
                     </DataGrid>
                 </Border>
 
-                <Border Grid.Row="6" Margin="0,10,0,0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFFDFDFD">
+                <Border Grid.Row="7" Margin="0,10,0,0" Padding="10" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFFDFDFD">
                     <StackPanel>
                         <TextBlock FontWeight="SemiBold" Text="Operación diaria" />
                         <StackPanel Margin="0,8,0,0" Orientation="Horizontal" VerticalAlignment="Center">

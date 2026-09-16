@@ -10,15 +10,27 @@ namespace PapaPersonas.Infrastructure.Stock.Paso4;
 public sealed class DuckDbPaso4StockService : IPaso4StockService
 {
     private readonly IPaso4ExtractionService _extractionService;
+    private readonly IPaso4ObraSocialCatalogStore _obraSocialCatalogStore;
 
     public DuckDbPaso4StockService()
-        : this(new DuckDbPaso4ExtractionService())
+        : this(new DuckDbPaso4ExtractionService(), new Paso4ObraSocialCatalogStore())
+    {
+    }
+
+    public DuckDbPaso4StockService(IPaso4ObraSocialCatalogStore obraSocialCatalogStore)
+        : this(new DuckDbPaso4ExtractionService(), obraSocialCatalogStore)
     {
     }
 
     internal DuckDbPaso4StockService(IPaso4ExtractionService extractionService)
+        : this(extractionService, new Paso4ObraSocialCatalogStore())
+    {
+    }
+
+    internal DuckDbPaso4StockService(IPaso4ExtractionService extractionService, IPaso4ObraSocialCatalogStore obraSocialCatalogStore)
     {
         _extractionService = extractionService;
+        _obraSocialCatalogStore = obraSocialCatalogStore;
     }
 
     public Paso4StockOverview GetOverview(string databasePath)
@@ -196,9 +208,49 @@ public sealed class DuckDbPaso4StockService : IPaso4StockService
             throw new InvalidOperationException("No existe un stock actual.");
         }
 
-        var groups = QuerySummaryGroups(connection, current.StockId);
+        var catalog = _obraSocialCatalogStore.Load();
+        var operational = QueryOperationalSummary(connection, current.StockId);
+        var catalogNames = new Dictionary<string, string>(catalog.NamesByNormalizedCode, StringComparer.Ordinal);
+        var missingCodes = new List<string>();
+        foreach (var group in operational)
+        {
+            if (!HasUsableCatalogName(catalogNames, group.NormalizedCodigo))
+            {
+                missingCodes.Add(group.NormalizedCodigo);
+            }
+        }
+
+        Dictionary<string, string> candidates = new(StringComparer.Ordinal);
+        if (missingCodes.Count > 0)
+        {
+            candidates = QueryNameCandidates(connection, current.StockId);
+            if (catalog.Warnings.Count == 0)
+            {
+                var additions = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var code in missingCodes)
+                {
+                    if (candidates.TryGetValue(code, out var candidate)
+                        && !string.IsNullOrWhiteSpace(candidate))
+                    {
+                        additions[code] = candidate.Trim();
+                    }
+                }
+
+                if (additions.Count > 0)
+                {
+                    foreach (var pair in additions)
+                    {
+                        catalogNames[pair.Key] = pair.Value;
+                    }
+
+                    _obraSocialCatalogStore.Save(catalogNames);
+                }
+            }
+        }
+
+        var groups = BuildSummaryGroups(operational, catalogNames, candidates);
         var headerWithGroupCount = current with { GroupCount = groups.Count };
-        return new Paso4StockSummaryResult(headerWithGroupCount, groups);
+        return new Paso4StockSummaryResult(headerWithGroupCount, groups, catalog.Warnings);
     }
 
     public async Task<Paso4SummaryExportResult> ExportSummaryCsvAsync(Paso4SummaryExportRequest request, CancellationToken cancellationToken)
@@ -450,56 +502,108 @@ public sealed class DuckDbPaso4StockService : IPaso4StockService
             GroupCount: 0);
     }
 
-    private static List<Paso4StockGroupSummaryRow> QuerySummaryGroups(DuckDBConnection connection, Guid stockId)
+    private static List<OperationalGroupRow> QueryOperationalSummary(DuckDBConnection connection, Guid stockId)
     {
-        // Resume el stock por código y obra social normalizados, conservando valores de presentación y calculando vendidos y disponibles.
+        // Resume el stock sólo por código normalizado; no lee nombres de integrantes.
         using var command = connection.CreateCommand();
         command.CommandText =
             """
             SELECT
                 UPPER(TRIM(COALESCE(codigo_obra_social, ''))) AS normalized_codigo,
-                UPPER(TRIM(COALESCE(obra_social, ''))) AS normalized_obra,
                 COUNT(*) AS total,
                 SUM(CASE WHEN vendido THEN 1 ELSE 0 END) AS sold,
-                MIN(COALESCE(codigo_obra_social, '')) AS raw_codigo,
-                MIN(COALESCE(obra_social, '')) AS raw_obra
+                MIN(COALESCE(codigo_obra_social, '')) AS raw_codigo
             FROM stock_members
             WHERE stock_id = $stockId
-            GROUP BY 1, 2
+            GROUP BY 1
             ORDER BY
                 CASE WHEN UPPER(TRIM(COALESCE(codigo_obra_social, ''))) = '' THEN 1 ELSE 0 END,
-                UPPER(TRIM(COALESCE(codigo_obra_social, ''))) ASC,
-                UPPER(TRIM(COALESCE(obra_social, ''))) ASC;
+                UPPER(TRIM(COALESCE(codigo_obra_social, ''))) ASC;
             """;
         command.Parameters.Add(new DuckDBParameter("stockId", stockId));
 
         using var reader = command.ExecuteReader();
-        var rows = new List<Paso4StockGroupSummaryRow>();
-        var index = 1;
+        var rows = new List<OperationalGroupRow>();
         while (reader.Read())
         {
-            var normalizedCode = reader.IsDBNull(0) ? string.Empty : reader.GetString(0);
-            var normalizedObra = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
-            var total = reader.GetInt32(2);
-            var sold = reader.GetInt32(3);
-            var rawCode = reader.IsDBNull(4) ? string.Empty : reader.GetString(4);
-            var rawObra = reader.IsDBNull(5) ? string.Empty : reader.GetString(5);
+            rows.Add(new OperationalGroupRow(
+                reader.IsDBNull(0) ? string.Empty : reader.GetString(0),
+                reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                reader.GetInt32(1),
+                reader.GetInt32(2)));
+        }
 
+        return rows;
+    }
+
+    private static Dictionary<string, string> QueryNameCandidates(DuckDBConnection connection, Guid stockId)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            WITH variants AS (
+                SELECT
+                    UPPER(TRIM(COALESCE(codigo_obra_social, ''))) AS code,
+                    TRIM(obra_social) AS name,
+                    COUNT(*) AS count
+                FROM stock_members
+                WHERE stock_id = $stockId
+                  AND TRIM(COALESCE(obra_social, '')) <> ''
+                GROUP BY 1, 2
+            )
+            SELECT code, name
+            FROM variants
+            QUALIFY ROW_NUMBER() OVER (PARTITION BY code ORDER BY count DESC, name ASC) = 1;
+            """;
+        command.Parameters.Add(new DuckDBParameter("stockId", stockId));
+
+        using var reader = command.ExecuteReader();
+        var candidates = new Dictionary<string, string>(StringComparer.Ordinal);
+        while (reader.Read())
+        {
+            var code = reader.IsDBNull(0) ? string.Empty : reader.GetString(0);
+            var name = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
+            candidates[code] = name;
+        }
+
+        return candidates;
+    }
+
+    private static List<Paso4StockGroupSummaryRow> BuildSummaryGroups(
+        IReadOnlyList<OperationalGroupRow> operational,
+        IReadOnlyDictionary<string, string> catalogNames,
+        IReadOnlyDictionary<string, string> candidates)
+    {
+        var rows = new List<Paso4StockGroupSummaryRow>(operational.Count);
+        var index = 1;
+        foreach (var group in operational)
+        {
+            catalogNames.TryGetValue(group.NormalizedCodigo, out var catalogName);
+            candidates.TryGetValue(group.NormalizedCodigo, out var candidateName);
+            var presentationName = Paso4ObraSocialPresentation.ResolvePresentationName(catalogName, candidateName);
             rows.Add(new Paso4StockGroupSummaryRow(
                 index,
-                rawCode,
-                rawObra,
-                normalizedCode,
-                normalizedObra,
-                total,
-                sold,
-                total - sold));
-
+                group.RawCodigo,
+                presentationName,
+                group.NormalizedCodigo,
+                presentationName,
+                group.Total,
+                group.Sold,
+                group.Total - group.Sold));
             index++;
         }
 
         return rows;
     }
+
+    private static bool HasUsableCatalogName(IReadOnlyDictionary<string, string> catalogNames, string normalizedCode)
+        => catalogNames.TryGetValue(normalizedCode, out var name) && !string.IsNullOrWhiteSpace(name);
+
+    private readonly record struct OperationalGroupRow(
+        string NormalizedCodigo,
+        string RawCodigo,
+        int Total,
+        int Sold);
 
     private static bool CurrentStockHasPendingToken(DuckDBConnection connection, System.Data.Common.DbTransaction tx)
     {
