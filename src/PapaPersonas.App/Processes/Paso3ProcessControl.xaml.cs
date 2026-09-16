@@ -71,29 +71,6 @@ public partial class Paso3ProcessControl : System.Windows.Controls.UserControl
         "fecha_importacion"
     ];
 
-    private static readonly string[] FilterColumns =
-    [
-        "apellido",
-        "nombre",
-        "obra_social",
-        "codigo_postal",
-        "localidad",
-        "provincia",
-        "edad",
-        "fecha_importacion",
-        "fecha_actualizacion"
-    ];
-
-    private static readonly string[] FilterOperators =
-    [
-        "eq",
-        "contains",
-        "starts_with",
-        "gte",
-        "lte",
-        "between"
-    ];
-
     private readonly IPaso3QueryService _queryService;
     private readonly IPaso3ExportService _exportService;
     private readonly ActivityBuffer _activity = new(maxMessages: 500);
@@ -151,10 +128,10 @@ public partial class Paso3ProcessControl : System.Windows.Controls.UserControl
 
     private void InitializeDefaults()
     {
-        FilterColumnCombo.ItemsSource = FilterColumns;
-        FilterColumnCombo.SelectedIndex = 0;
-        FilterOperatorCombo.ItemsSource = FilterOperators;
-        FilterOperatorCombo.SelectedItem = "contains";
+        FilterColumnCombo.ItemsSource = Paso3FilterCatalog.Columns;
+        FilterColumnCombo.SelectedValue = Paso3FilterCatalog.FilterColumns[0];
+        FilterOperatorCombo.ItemsSource = Paso3FilterCatalog.Operators;
+        FilterOperatorCombo.SelectedValue = "contains";
 
         var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         ExportPathTextBox.Text = Path.Combine(documents, "PapaPersonas", "Proceso3", "consulta.csv");
@@ -333,8 +310,8 @@ public partial class Paso3ProcessControl : System.Windows.Controls.UserControl
 
     private void AddFilter_Click(object sender, RoutedEventArgs e)
     {
-        var column = FilterColumnCombo.SelectedItem?.ToString();
-        var op = FilterOperatorCombo.SelectedItem?.ToString();
+        var column = FilterColumnCombo.SelectedValue as string;
+        var op = FilterOperatorCombo.SelectedValue as string;
         var value = FilterValueTextBox.Text?.Trim() ?? string.Empty;
 
         if (string.IsNullOrWhiteSpace(column) || string.IsNullOrWhiteSpace(op) || string.IsNullOrWhiteSpace(value))
@@ -563,7 +540,7 @@ public partial class Paso3ProcessControl : System.Windows.Controls.UserControl
     {
         ActiveFiltersListBox.ItemsSource = null;
         ActiveFiltersListBox.ItemsSource = _filters
-            .Select(static filter => $"{filter.Column} {filter.Operator} {filter.Value}")
+            .Select(static filter => Paso3FilterCatalog.FormatActiveFilter(filter))
             .ToArray();
     }
 

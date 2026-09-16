@@ -367,21 +367,70 @@ public sealed class DuckDbPaso3QueryServiceTests
     }
 
     [Fact]
-    public void QueryPreview_NumericColumnUnsupportedOperator_IsRejected()
+    public void QueryPreview_NumericEdadFilters_UseImportedValuesAndClosedBetween()
+    {
+        using var ctx = CreateDbContext();
+        using (var connection = OpenConnection(ctx.DatabasePath))
+        {
+            InsertPersona(connection, "25000000039", "EDAD", "A", "CABA", "2026-08-10", "2026-08-12 10:00:00", edad: 39);
+            InsertPersona(connection, "25000000040", "EDAD", "B", "CABA", "2026-08-10", "2026-08-12 10:00:00", edad: 40);
+            InsertPersona(connection, "25000000041", "EDAD", "C", "CABA", "2026-08-10", "2026-08-12 10:00:00", edad: 41);
+            InsertPersona(connection, "25000000042", "EDAD", "D", "CABA", "2026-08-10", "2026-08-12 10:00:00", edad: 42);
+        }
+
+        var service = new DuckDbPaso3QueryService();
+        var gteResult = service.QueryPreview(new Paso3PreviewRequest(
+            ctx.DatabasePath,
+            null,
+            [new Paso3Filter("edad", "gte", "40")],
+            null,
+            null,
+            ["cuil", "edad"],
+            1,
+            50));
+
+        Assert.Equal(3, gteResult.TotalCount);
+        Assert.Equal(
+            ["25000000040", "25000000041", "25000000042"],
+            gteResult.Rows.Select(row => Assert.IsType<string>(row.Values["cuil"])).ToArray());
+
+        var betweenResult = service.QueryPreview(new Paso3PreviewRequest(
+            ctx.DatabasePath,
+            null,
+            [new Paso3Filter("edad", "between", "40,41")],
+            null,
+            null,
+            ["cuil", "edad"],
+            1,
+            50));
+
+        Assert.Equal(2, betweenResult.TotalCount);
+        Assert.Equal(
+            ["25000000040", "25000000041"],
+            betweenResult.Rows.Select(row => Assert.IsType<string>(row.Values["cuil"])).ToArray());
+    }
+
+    [Theory]
+    [InlineData("edad", "contains", "40")]
+    [InlineData("edad", "eq", "cuarenta")]
+    [InlineData("anio", "between", "2020,not-a-number")]
+    public void QueryPreview_InvalidNumericFilter_IsRejected(string column, string op, string value)
     {
         using var ctx = CreateDbContext();
         var service = new DuckDbPaso3QueryService();
 
-        Assert.Throws<ArgumentException>(() =>
+        var exception = Assert.Throws<ArgumentException>(() =>
             service.QueryPreview(new Paso3PreviewRequest(
                 ctx.DatabasePath,
                 null,
-                [new Paso3Filter("edad", "gte", "40")],
+                [new Paso3Filter(column, op, value)],
                 null,
                 null,
                 ["cuil"],
                 1,
                 10)));
+
+        Assert.Contains("numéric", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     private static TestDbContext CreateDbContext()
@@ -403,7 +452,9 @@ public sealed class DuckDbPaso3QueryServiceTests
         string nombre,
         string provincia,
         string? importDate,
-        string updatedAt)
+        string updatedAt,
+        int? edad = null,
+        int? anio = null)
     {
         var importDateValue = string.IsNullOrWhiteSpace(importDate) ? "NULL" : "CAST($importDate AS DATE)";
         ExecuteNonQuery(
@@ -415,21 +466,27 @@ public sealed class DuckDbPaso3QueryServiceTests
                 nombre,
                 provincia,
                 fecha_importacion,
-                fecha_actualizacion)
+                fecha_actualizacion,
+                edad,
+                anio)
             VALUES (
                 $cuil,
                 $apellido,
                 $nombre,
                 $provincia,
                 {importDateValue},
-                CAST($updatedAt AS TIMESTAMP));
+                CAST($updatedAt AS TIMESTAMP),
+                $edad,
+                $anio);
             """,
             new DuckDBParameter("cuil", cuil),
             new DuckDBParameter("apellido", apellido),
             new DuckDBParameter("nombre", nombre),
             new DuckDBParameter("provincia", provincia),
             new DuckDBParameter("importDate", (object?)importDate ?? DBNull.Value),
-            new DuckDBParameter("updatedAt", updatedAt));
+            new DuckDBParameter("updatedAt", updatedAt),
+            new DuckDBParameter("edad", (object?)edad ?? DBNull.Value),
+            new DuckDBParameter("anio", (object?)anio ?? DBNull.Value));
     }
 
     private static DuckDBConnection OpenConnection(string dbPath)

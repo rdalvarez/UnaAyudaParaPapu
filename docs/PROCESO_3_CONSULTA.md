@@ -15,11 +15,13 @@ Proceso 3 V1 está diseñado para extracción simple y segura desde `personas`.
 | Incluye | No incluye |
 |---|---|
 | CUIL exacto | Editor SQL libre |
-| Filtros AND guiados (`eq`, `contains`, `starts_with`, `gte`, `lte`, `between`) | Builder avanzado tipo BI |
+| Filtros AND guiados (Igual a, Contiene, Comienza con, Mayor o igual que, Menor o igual que, Entre) | Builder avanzado tipo BI |
 | Rango de `fecha_importacion` | Joins/tablas externas |
 | Selección de columnas | Transformaciones complejas |
 | Preview paginado + KPI (`total`, `page rows`, `latest fecha_importacion`) | Cargas masivas en memoria |
 | Export CSV streaming con cancelar/progreso | Export con lógica custom por fila |
+
+Los filtros guiados usan sólo valores ya importados. `edad` filtra `personas.edad`; no se calcula desde `fecha_nacimiento`. El combo muestra etiquetas en español (DNI, Sexo, Código de obra social, Partido, Nacionalidad, CUIT del empleador, Fecha de nacimiento, etc.); la consulta y la exportación siguen usando los códigos internos (`dni`, `eq`, `contains`, `starts_with`, `gte`, `lte`, `between`).
 
 ## Regla de privacidad y logging
 

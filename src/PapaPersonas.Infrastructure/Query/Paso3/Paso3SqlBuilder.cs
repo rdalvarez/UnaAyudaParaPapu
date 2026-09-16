@@ -59,8 +59,15 @@ internal static class Paso3SqlBuilder
         "fecha_nacimiento"
     ];
 
+    private static readonly HashSet<string> NumericColumns =
+    [
+        "edad",
+        "anio"
+    ];
+
     private static readonly HashSet<string> TextOperators = ["eq", "contains", "starts_with"];
     private static readonly HashSet<string> DateOperators = ["eq", "gte", "lte", "between"];
+    private static readonly HashSet<string> NumericOperators = ["eq", "gte", "lte", "between"];
 
     /// <summary>Construye SQL parametrizado con filtros, columnas y paginación deterministas.</summary>
     public static Paso3BuiltQuery Build(Paso3PreviewRequest request, bool includePagination)
@@ -103,6 +110,15 @@ internal static class Paso3SqlBuilder
                 }
 
                 AppendDateClause(column, op, filter.Value, whereClauses, parameters);
+            }
+            else if (NumericColumns.Contains(column))
+            {
+                if (!NumericOperators.Contains(op))
+                {
+                    throw new ArgumentException($"El operador numérico '{filter.Operator}' no está permitido para la columna '{filter.Column}'.", nameof(request));
+                }
+
+                AppendNumericClause(column, op, filter.Value, whereClauses, parameters);
             }
             else
             {
@@ -231,6 +247,85 @@ internal static class Paso3SqlBuilder
                 break;
             }
         }
+    }
+
+    private static void AppendNumericClause(
+        string column,
+        string op,
+        string value,
+        List<string> whereClauses,
+        List<(string Name, object? Value)> parameters)
+    {
+        switch (op)
+        {
+            case "eq":
+            {
+                var number = ParseIntegerValue(value, allowRange: false).Single();
+                var name = NextParameter(parameters.Count);
+                whereClauses.Add($"{column} = ${name}");
+                parameters.Add((name, number));
+                break;
+            }
+            case "gte":
+            {
+                var number = ParseIntegerValue(value, allowRange: false).Single();
+                var name = NextParameter(parameters.Count);
+                whereClauses.Add($"{column} >= ${name}");
+                parameters.Add((name, number));
+                break;
+            }
+            case "lte":
+            {
+                var number = ParseIntegerValue(value, allowRange: false).Single();
+                var name = NextParameter(parameters.Count);
+                whereClauses.Add($"{column} <= ${name}");
+                parameters.Add((name, number));
+                break;
+            }
+            case "between":
+            {
+                var range = ParseIntegerValue(value, allowRange: true);
+                var startName = NextParameter(parameters.Count);
+                parameters.Add((startName, range[0]));
+                var endName = NextParameter(parameters.Count);
+                parameters.Add((endName, range[1]));
+                whereClauses.Add($"{column} BETWEEN ${startName} AND ${endName}");
+                break;
+            }
+        }
+    }
+
+    private static IReadOnlyList<int> ParseIntegerValue(string value, bool allowRange)
+    {
+        if (!allowRange)
+        {
+            if (!TryParseInvariantInt(value, out var number))
+            {
+                throw new ArgumentException($"El valor numérico '{value}' no es válido.");
+            }
+
+            return [number];
+        }
+
+        var parts = value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 2
+            || !TryParseInvariantInt(parts[0], out var start)
+            || !TryParseInvariantInt(parts[1], out var end))
+        {
+            throw new ArgumentException($"El rango numérico entre '{value}' no es válido.");
+        }
+
+        if (start > end)
+        {
+            throw new ArgumentException("El inicio del rango debe ser <= al final.");
+        }
+
+        return [start, end];
+    }
+
+    private static bool TryParseInvariantInt(string value, out int number)
+    {
+        return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out number);
     }
 
     private static IReadOnlyList<DateOnly> ParseDateValue(string value, bool allowRange)

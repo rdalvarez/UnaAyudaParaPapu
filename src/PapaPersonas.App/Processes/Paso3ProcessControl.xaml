@@ -73,8 +73,8 @@
                                 <ColumnDefinition Width="140" />
                             </Grid.ColumnDefinitions>
 
-                            <ComboBox x:Name="FilterColumnCombo" Grid.Column="0" Margin="0,0,8,0" />
-                            <ComboBox x:Name="FilterOperatorCombo" Grid.Column="1" Margin="0,0,8,0" />
+                            <ComboBox x:Name="FilterColumnCombo" Grid.Column="0" Margin="0,0,8,0" DisplayMemberPath="Label" SelectedValuePath="Code" />
+                            <ComboBox x:Name="FilterOperatorCombo" Grid.Column="1" Margin="0,0,8,0" DisplayMemberPath="Label" SelectedValuePath="Code" />
                             <TextBox x:Name="FilterValueTextBox" Grid.Column="2" Margin="0,0,8,0" />
                             <Button x:Name="AddFilterButton" Grid.Column="3" Content="Agregar filtro" Click="AddFilter_Click" />
                         </Grid>
