@@ -466,6 +466,50 @@ public partial class Paso2ProcessControl : System.Windows.Controls.UserControl
         OpenPath(outputDirectory, "carpeta de salida de Paso 2");
     }
 
+    private void DownloadValidColumns_Click(object sender, RoutedEventArgs e)
+    {
+        if (IsInteractionBlocked())
+        {
+            return;
+        }
+
+        using var dialog = new Forms.SaveFileDialog
+        {
+            Title = "Guardar columnas válidas",
+            Filter = "Archivos CSV (*.csv)|*.csv",
+            AddExtension = true,
+            OverwritePrompt = true,
+            FileName = SergioValidHeadersReferenceCsv.SuggestedFileName
+        };
+
+        if (dialog.ShowDialog() != Forms.DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            SergioValidHeadersReferenceCsv.Write(dialog.FileName);
+            var owner = Window.GetWindow(this);
+            var message = $"Archivo guardado: {dialog.FileName}";
+            if (owner is null)
+            {
+                MessageBox.Show(message, "Columnas válidas", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            MessageBox.Show(owner, message, "Columnas válidas", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            ShowWarning(
+                UserFacingExceptionMessage.WithTechnicalDetail(
+                    "No se pudo guardar el archivo de columnas válidas.",
+                    ex),
+                "No se pudo guardar");
+        }
+    }
+
     private bool TryValidateDbPath(out string databasePath)
     {
         databasePath = _databasePathProvider?.Invoke() ?? string.Empty;
@@ -620,6 +664,8 @@ public partial class Paso2ProcessControl : System.Windows.Controls.UserControl
         ApplyPaso2Button.IsEnabled = canEdit && _state.CanApply;
 
         Paso2ProgressBar.Visibility = localBusy ? Visibility.Visible : Visibility.Collapsed;
+
+        DownloadValidColumnsButton.IsEnabled = canEdit;
 
         if (globalBusy || localBusy)
         {

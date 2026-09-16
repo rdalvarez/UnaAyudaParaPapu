@@ -1,5 +1,4 @@
 using System.Windows;
-using PapaPersonas.Core.Import.Paso2;
 
 namespace PapaPersonas.App.Processes;
 

@@ -73,6 +73,9 @@
                     <Button x:Name="OpenPaso2OutputFolderButton" Margin="12,0,0,0" Content="Abrir carpeta de salida" Width="170" IsEnabled="False" Click="OpenPaso2OutputFolder_Click"
                             automation:AutomationProperties.Name="Abrir carpeta de salida de Paso 2"
                             automation:AutomationProperties.HelpText="Abre la carpeta del CSV de rechazados cuando está disponible." />
+                    <Button x:Name="DownloadValidColumnsButton" Margin="12,0,0,0" Content="Descargar columnas válidas" Width="200" Click="DownloadValidColumns_Click"
+                            automation:AutomationProperties.Name="Descargar columnas válidas de Paso 2"
+                            automation:AutomationProperties.HelpText="Descarga el CSV de referencia de columnas válidas de Sergio." />
                 </StackPanel>
 
                 <StackPanel Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,12,0,0" Orientation="Horizontal" VerticalAlignment="Center">

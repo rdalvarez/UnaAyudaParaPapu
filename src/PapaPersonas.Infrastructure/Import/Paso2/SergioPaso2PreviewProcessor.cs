@@ -310,17 +310,19 @@ public sealed class SergioPaso2PreviewProcessor
 
         try
         {
+            string contentHash;
             using (var source = new FileStream(normalizedPath, FileMode.Open, FileAccess.Read, FileShare.Read))
             using (var snapshot = new FileStream(snapshotPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read))
             {
-                var contentHash = CopyAndHash(source, snapshot);
+                contentHash = CopyAndHash(source, snapshot);
                 snapshot.Flush(flushToDisk: true);
-                var headers = _rowSource.ReadHeaders(snapshotPath);
-                return new SourceSnapshot(
-                    snapshotPath,
-                    new SergioSourceIdentity(normalizedPath, contentHash, HeaderContractValidator.GetSourceShapeFingerprint(headers)),
-                    headers);
             }
+
+            var headers = _rowSource.ReadHeaders(snapshotPath);
+            return new SourceSnapshot(
+                snapshotPath,
+                new SergioSourceIdentity(normalizedPath, contentHash, HeaderContractValidator.GetSourceShapeFingerprint(headers)),
+                headers);
         }
         catch
         {

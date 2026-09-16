@@ -4,6 +4,21 @@ This step is a preparatory helper flow. It cleans/validates Hernán input and pr
 
 It does **not** update DuckDB `personas`.
 
+## Distinción operativa: pedido y devolución
+
+El archivo generado en este paso es el **pedido enviado a Sergio**. No es el archivo que vuelve de Sergio y, por lo tanto, **nunca debe cargarse en el Proceso 2**.
+
+| Archivo | Propósito | Nombre típico | Encabezados para reconocerlo | Dónde se usa | Nunca hacer |
+|---|---|---|---|---|---|
+| Pedido a Sergio | Solicitar el enriquecimiento de datos. | `2 - PEDIDO_Sergio_Pegar_Domic_tel_O.S._10_08_2026.xlsx` | `CUIL`, `APELLIDO_NOMBRE`, `CD_OS`, `DESCRIPCION O_S`, `FECHA_NAC`, `EDAD` | Se envía a Sergio al finalizar Paso 1. | No cargarlo en Proceso 2 ni confirmarlo como devolución. |
+| Devolución de Sergio | Incorporar los datos enriquecidos en la base maestra. | `3 - Devolucón_Sergio_10_08_2026__HERNAN_Procesado.xlsx` | `APELLIDO` y `NOMBRE` separados, más datos de domicilio y contacto, por ejemplo `DIRECCION`, `TELPART1`, `CELULAR1`, `EMAIL1`, `CODIGOOS` y `OBRASOCIAL`. | Se selecciona en Proceso 2 para analizar y, luego de la confirmación, sincronizar la base. | No confundirla con el pedido ni reemplazar el pedido por una carga de Proceso 2. |
+
+### Encabezados observados en la devolución de Sergio
+
+La devolución inspeccionada tiene 28 encabezados reconocidos: `CUIL`, `APELLIDO`, `NOMBRE`, `DIRECCION`, `CP`, `LOCALIDAD`, `PARTIDO`, `PROVINCIA`, `NACIONALIDAD`, `TELPART1`, `TELPART2`, `CELULAR1`, `WSP1`, `CELULAR2`, `WSP2`, `CELULAR3`, `WSP3`, `CELULAR4`, `WSP4`, `CELULAR5`, `WSP5`, `EMAIL1`, `EMAIL2`, `EMAIL3`, `CODIGOOS`, `OBRASOCIAL`, `FECNANAC`, `EDAD`.
+
+Para la acción ante un archivo equivocado en Proceso 2, consultar [Solución de problemas: se seleccionó el pedido de Paso 1](PROCESO_2_SERGIO.md#solución-de-problemas-se-seleccionó-el-pedido-de-paso-1).
+
 ## Quick path
 
 1. Build a `HernanPreparationRequest` with input file path and output folder.
@@ -65,7 +80,7 @@ Validation rules:
 ## CLI entrypoint (implemented)
 
 ```bash
-dotnet run --project src/PapaPersonas.Cli -- paso1-hernan --input "D:\OneDrive\papa\HERNAN y SERGIO\1 - PedidoOOSS_10_08_2026__HERNAN.xlsx" --output "D:\OneDrive\papa\PapaPersonas\outputs\paso1" --config "config/PARA_HERNAN.json"
+dotnet run --project src/PapaPersonas.Cli -- paso1-hernan --input "<archivo-hernan.xlsx>" --output "<carpeta-de-salida>" --config "config/PARA_HERNAN.json"
 ```
 
 ## Header contract for Paso 1
@@ -106,8 +121,8 @@ This keeps behavior deterministic while avoiding full-row payload retention.
 ```csharp
 var processor = new HernanPaso1Processor();
 var result = processor.Process(new HernanPreparationRequest(
-    inputFilePath: @"D:\OneDrive\papa\HERNAN y SERGIO\1 - PedidoOOSS_10_08_2026__HERNAN.xlsx",
-    outputDirectory: @"D:\OneDrive\papa\PapaPersonas\out"));
+    inputFilePath: @"<archivo-hernan.xlsx>",
+    outputDirectory: @"<carpeta-de-salida>"));
 ```
 
 ## Notes

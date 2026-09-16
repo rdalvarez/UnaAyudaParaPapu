@@ -1,6 +1,8 @@
 using System.IO.Compression;
 using System.Text;
 using PapaPersonas.Core.Import;
+using PapaPersonas.Core.Import.Paso2;
+using PapaPersonas.Infrastructure.Database;
 using PapaPersonas.Infrastructure.Import.Paso2;
 
 namespace PapaPersonas.Tests.Import.Paso2;
@@ -33,6 +35,37 @@ public sealed class ExcelDataReaderSergioRowSourceIntegrationTests
             Assert.Equal("45567", row.GetValue("fecha_nacimiento"));
             Assert.Equal("33", row.GetValue("edad"));
             Assert.Equal("4412", row.GetValue("codigo_postal"));
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void Analyze_PhysicalXlsxWithRealRowSource_ReadsHeadersAfterSnapshotWriterCloses()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "PapaPersonas.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        var filePath = Path.Combine(tempRoot, "sergio_synthetic.xlsx");
+        var databasePath = Path.Combine(tempRoot, "PapaPersonas.duckdb");
+
+        try
+        {
+            CreateSyntheticXlsx(filePath, HeaderContracts.SergioActualHeaders28);
+            var bootstrap = new DuckDbBootstrapper().Initialize(databasePath);
+            Assert.True(bootstrap.IsSuccess, bootstrap.Message);
+
+            var result = new SergioPaso2PreviewProcessor(new ExcelDataReaderSergioRowSource()).Analyze(
+                new SergioStagePreviewRequest(filePath, databasePath, new DateOnly(2026, 8, 10)));
+
+            Assert.True(result.IsSuccess, result.FailureMessage);
+            Assert.Equal(SergioStagePreviewStatus.ReadyForConfirmation, result.Status);
+            Assert.Equal(1, result.Summary.TotalRows);
+            Assert.Equal(1, result.Summary.ValidRows);
         }
         finally
         {
