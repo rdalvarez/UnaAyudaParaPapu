@@ -123,14 +123,16 @@ The current application contains a cumulative master-database workflow that is n
   - Scope: while header detection runs, show an indeterminate progress bar and a short status such as `Leyendo encabezados...`; hide both after success or failure. Reuse the existing busy boundary without adding cancellation, percentages, or new processing logic.
   - Acceptance: the indicator becomes visible before background work starts, remains visible while controls are disabled, and is always hidden when the operation completes or fails.
   - Evidence:
-     - `dotnet build V2/PapaPersonas.sln -c Release --no-restore`: passed; 0 warnings, 0 errors.
-     - `dotnet test V2/PapaPersonas.sln -c Release --no-build`: passed; 4 passed, 0 failed, 0 skipped.
-     - XAML/code-behind readback: passed; the indicator is `Collapsed` by default, its `ProgressBar` is indeterminate, its text is `Leyendo encabezados...`, and `SetBusy(true)`/`SetBusy(false)` show and hide it. The existing `finally` calls `SetBusy(false)`, restoring the hidden state after success, error, or exception exit. Accessibility names and a polite live setting are present.
-     - Runtime harness: passed; the V2 Release executable started, exposed the main window, closed cleanly, and exited with code 0.
-     - Manual acceptance carried forward from V2L-004: passed with a real workbook; input path, automatic `rech` folder creation, clickable folder access, complete detected-column list, and both column selectors worked as expected.
-     - Rollback boundary: remove the V2 header-reading indicator and its README/ODD evidence changes; V1 and V2L-004 behavior remain outside the boundary.
-     - RDD risk: `disabled/unmanaged`.
-    - Commit: pending until verification and staging are complete.
+    - `dotnet build V2/PapaPersonas.sln -c Release --no-restore`: passed; 0 warnings, 0 errors.
+    - `dotnet test V2/PapaPersonas.sln -c Release --no-build`: passed; 4 passed, 0 failed, 0 skipped.
+    - XAML/code-behind readback: passed; the indicator is `Collapsed` by default, its `ProgressBar` is indeterminate, its text is `Leyendo encabezados...`, and `SetBusy(true)`/`SetBusy(false)` show and hide it. The existing `finally` calls `SetBusy(false)`, restoring the hidden state after success, error, or exception exit. Accessibility names and a polite live setting are present.
+    - Runtime harness: passed; the V2 Release executable started, exposed the main window, closed cleanly, and exited with code 0.
+    - Manual acceptance carried forward from V2L-004: passed with a real workbook; input path, automatic `rech` folder creation, clickable folder access, complete detected-column list, and both column selectors worked as expected.
+    - Rollback boundary: remove the V2 header-reading indicator and its README/ODD evidence changes; V1 and V2L-004 behavior remain outside the boundary.
+    - RDD risk: `disabled/unmanaged`; automated assessment was high only because the unchanged file still contains the pre-existing folder-opening process boundary.
+    - Commit: `0eec9ff` (`feat(v2): show header detection progress`).
+    - Parent spot check: `dotnet test V2/PapaPersonas.sln -c Release --no-build` passed again with 4 passed, 0 failed, and 0 skipped.
+    - Independent verification: PASS; confirmed the diff only adds busy feedback and documentation, with 0 build warnings/errors and 4 passing tests.
 
 ## Confirmed Future Cleaning Semantics
 
