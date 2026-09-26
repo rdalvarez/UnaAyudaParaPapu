@@ -54,13 +54,17 @@ The current application contains a cumulative master-database workflow that is n
     - Parent spot check: `dotnet test V1/PapaPersonas.sln -c Release --no-build` passed again with 357 passed, 0 failed, and 0 skipped.
     - Independent verification: PASS. Git reported 229 `R100`/`C100` entries plus this ODD document; blob comparison found 0 mismatches, and an independent Release build passed with 0 warnings and 0 errors.
 
-- [ ] **V2L-002 — Create repository landing documentation**
+- [x] **V2L-002 — Create repository landing documentation**
   - Route: inline if limited to the root README; otherwise delegated.
   - Trigger evidence: expected to be a single already-understood documentation file.
   - Acceptance: the root README clearly links to V1 and V2 and does not duplicate version-specific operating instructions.
   - Checks: structural readback and link/path validation.
   - Rollback boundary: root README changes only.
-  - Evidence: pending.
+  - Evidence:
+    - Root `README.md` now acts as a concise version selector and links to `V1/README.md` and this feature document.
+    - V1 build, test, runtime, privacy, and database guidance remains version-specific under `V1/README.md`.
+    - Repository paths in the V1 quick-start commands match the verified relocated solution.
+    - Structural readback and Markdown path checks passed.
 
 - [ ] **V2L-003 — Scaffold the independent V2 shell**
   - Route: delegated direct.
@@ -90,4 +94,4 @@ The current application contains a cumulative master-database workflow that is n
 
 ## Progress and Next Step
 
-`V2L-001` is complete and independently verified. Await explicit continuation before starting `V2L-002` or creating V2 files.
+`V2L-001` and `V2L-002` are complete. The next authorized work unit is `V2L-003`: create the independent V2 shell without cleaning logic.
