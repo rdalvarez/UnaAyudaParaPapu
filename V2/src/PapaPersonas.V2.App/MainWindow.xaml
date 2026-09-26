@@ -31,23 +31,23 @@
                     <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
                         <StackPanel Margin="0,0,6,0">
                             <TextBlock FontSize="18" FontWeight="SemiBold" Text="Preparar archivo de Hernán" />
-                            <TextBlock Margin="0,4,0,14" Foreground="#FF666666" Text="Esta fase presenta la interfaz. La lectura y el procesamiento estarán disponibles en una etapa posterior." TextWrapping="Wrap" />
+                            <TextBlock Margin="0,4,0,14" Foreground="#FF666666" Text="La selección de archivo y la lectura de encabezados están disponibles. La limpieza, exportación y persistencia todavía no." TextWrapping="Wrap" />
 
                             <GroupBox Header="Archivos" Padding="10">
                                 <Grid>
                                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="170" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                     <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Archivo de entrada" />
-                                     <TextBox x:Name="InputFileTextBox" Grid.Row="0" Grid.Column="1" Margin="8,4" IsReadOnly="True" />
-                                     <Button Grid.Row="0" Grid.Column="2" Margin="8,4" Content="Buscar archivo" Click="BrowseFileButton_OnClick" />
-                                     <TextBlock x:Name="RejectedFolderLabel" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Carpeta de rechazados" Cursor="Hand" Foreground="#FF245A9B" TextDecorations="Underline" MouseLeftButtonUp="RejectedFolderLabel_OnClick" />
-                                     <TextBox x:Name="RejectedFolderTextBox" Grid.Row="1" Grid.Column="1" Margin="8,4" IsReadOnly="True" />
-                                     <Button Grid.Row="1" Grid.Column="2" Margin="8,4" Content="Buscar carpeta" Click="BrowseFolderButton_OnClick" />
+                                    <TextBox x:Name="InputFileTextBox" Grid.Row="0" Grid.Column="1" Margin="8,4" IsReadOnly="True" />
+                                    <Button x:Name="BrowseFileButton" Grid.Row="0" Grid.Column="2" Margin="8,4" Content="Buscar archivo" Click="BrowseFileButton_OnClick" />
+                                    <TextBlock x:Name="RejectedFolderLabel" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Carpeta de rechazados" Cursor="Hand" Foreground="#FF245A9B" TextDecorations="Underline" MouseLeftButtonUp="RejectedFolderLabel_OnClick" />
+                                    <TextBox x:Name="RejectedFolderTextBox" Grid.Row="1" Grid.Column="1" Margin="8,4" IsReadOnly="True" />
+                                    <Button x:Name="BrowseFolderButton" Grid.Row="1" Grid.Column="2" Margin="8,4" Content="Buscar carpeta" Click="BrowseFolderButton_OnClick" />
                                 </Grid>
                             </GroupBox>
 
                             <GroupBox Header="Columnas detectadas" Padding="10" Margin="0,12,0,0">
-                                 <ListBox x:Name="DetectedColumnsListBox" Height="72" DisplayMemberPath="DisplayName" AutomationProperties.Name="Columnas detectadas" />
+                                <ListBox x:Name="DetectedColumnsListBox" Height="72" DisplayMemberPath="DisplayName" AutomationProperties.Name="Columnas detectadas" />
                             </GroupBox>
 
                             <GroupBox Header="Limpieza (no disponible en esta fase)" Padding="10" Margin="0,12,0,0">
@@ -55,12 +55,12 @@
                                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="170" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                     <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Duplicados" />
-                                     <ComboBox x:Name="DuplicateColumnComboBox" Grid.Row="0" Grid.Column="1" Margin="8,4" DisplayMemberPath="DisplayName" IsEnabled="False" AutomationProperties.Name="Columna para duplicados" />
+                                    <ComboBox x:Name="DuplicateColumnComboBox" Grid.Row="0" Grid.Column="1" Margin="8,4" DisplayMemberPath="DisplayName" IsEnabled="False" AutomationProperties.Name="Columna para duplicados" />
                                     <Button Grid.Row="0" Grid.Column="2" Margin="8,4" Content="Quitar duplicados" IsEnabled="False" />
                                     <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Valores vacíos" />
-                                     <ComboBox x:Name="EmptyColumnComboBox" Grid.Row="1" Grid.Column="1" Margin="8,4" DisplayMemberPath="DisplayName" IsEnabled="False" AutomationProperties.Name="Columna para vacíos" />
+                                    <ComboBox x:Name="EmptyColumnComboBox" Grid.Row="1" Grid.Column="1" Margin="8,4" DisplayMemberPath="DisplayName" IsEnabled="False" AutomationProperties.Name="Columna para vacíos" />
                                     <Button Grid.Row="1" Grid.Column="2" Margin="8,4" Content="Quitar valores vacíos" IsEnabled="False" />
-                                     <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,8,0,0" Foreground="#FF777777" Text="La limpieza todavía no está disponible." />
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,8,0,0" Foreground="#FF777777" Text="La limpieza todavía no está disponible." />
                                 </Grid>
                             </GroupBox>
 
@@ -72,7 +72,7 @@
                     </ScrollViewer>
                     <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Center" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" Background="#FFDDDDDD" />
                     <GroupBox Grid.Row="2" Header="Actividad — los eventos más recientes aparecerán primero" Padding="6">
-                         <TextBox x:Name="ActivityTextBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" FontFamily="Consolas" FontSize="12" Background="#FFF8F8F8" BorderThickness="0" />
+                        <TextBox x:Name="ActivityTextBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" FontFamily="Consolas" FontSize="12" Background="#FFF8F8F8" BorderThickness="0" />
                     </GroupBox>
                 </Grid>
             </TabItem>
@@ -82,7 +82,7 @@
         </TabControl>
 
         <Border Grid.Row="4" Padding="8" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFF9F9F9">
-            <TextBlock Text="V2 en fase visual: no hay lectura, limpieza, exportación ni persistencia disponibles." TextWrapping="Wrap" />
+            <TextBlock Text="Selección de archivo y lectura de encabezados disponibles. Limpieza, exportación y persistencia todavía no." TextWrapping="Wrap" />
         </Border>
     </Grid>
 </Window>

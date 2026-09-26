@@ -105,7 +105,8 @@ The current application contains a cumulative master-database workflow that is n
     - Synthetic header scenario: passed through test-only in-memory normalization coverage for ordered, empty, repeated case-insensitive headers and unique positional identities. No real workbook or personal data was used.
     - Rollback boundary: V2 column discovery, folder selection, activity, and selector behavior in `V2/` only.
     - RDD risk: `disabled/unmanaged`.
-    - Commit: pending until final verification and staging.
+    - Commit: `fix(v2): harden Paso 1 column discovery` (hash reported by final git readback).
+    - Bounded correction: updated Paso 1 copy, named and disabled file/folder controls during asynchronous detection with `finally` restoration, and guarded rejected-folder opening with safe operational logging and a friendly message. Cleaning, export, Sergio, DuckDB, and row processing remain out of scope.
 
 ## Confirmed Future Cleaning Semantics
 

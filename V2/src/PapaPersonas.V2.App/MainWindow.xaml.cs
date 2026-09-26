@@ -57,6 +57,7 @@ public partial class MainWindow : Window
 
         try
         {
+            SetBusy(true);
             var path = dialog.FileName;
             var rejectedFolder = RejectedFolderPolicy.GetDefault(path);
             var columns = await Task.Run(() =>
@@ -77,6 +78,10 @@ public partial class MainWindow : Window
         {
             AddActivity("Error amigable: no se pudo preparar el archivo seleccionado.");
             System.Windows.MessageBox.Show(this, $"No se pudo leer el archivo o crear la carpeta de rechazados.\n\n{exception.Message}", "No se pudo cargar el archivo", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            SetBusy(false);
         }
     }
 
@@ -115,6 +120,14 @@ public partial class MainWindow : Window
         EmptyColumnComboBox.IsEnabled = columns.Count > 0;
     }
 
+    private void SetBusy(bool isBusy)
+    {
+        BrowseFileButton.IsEnabled = !isBusy;
+        BrowseFolderButton.IsEnabled = !isBusy;
+        RejectedFolderLabel.IsEnabled = !isBusy;
+        RejectedFolderTextBox.IsEnabled = !isBusy;
+    }
+
     private void AddActivity(string message)
     {
         _activityLog.Add(message);
@@ -123,13 +136,23 @@ public partial class MainWindow : Window
 
     private void OpenRejectedFolder()
     {
-        if (!string.IsNullOrWhiteSpace(_rejectedFolderPath) && Directory.Exists(_rejectedFolderPath))
+        if (string.IsNullOrWhiteSpace(_rejectedFolderPath) || !Directory.Exists(_rejectedFolderPath))
+        {
+            return;
+        }
+
+        try
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
                 FileName = _rejectedFolderPath,
                 UseShellExecute = true
             });
+        }
+        catch
+        {
+            AddActivity("Error amigable: no se pudo abrir la carpeta de rechazados.");
+            System.Windows.MessageBox.Show(this, "No se pudo abrir la carpeta de rechazados.", "No se pudo abrir la carpeta", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
