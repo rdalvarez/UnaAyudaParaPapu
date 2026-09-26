@@ -86,6 +86,7 @@ The current application contains a cumulative master-database workflow that is n
     - Correction verification: Release build, focused test suite, and V2 runtime harness passed after the correction. No V1 files or behavior changed.
     - Correction commit: `ee1b0a4` (`fix(v2): bind shell tabs and improve Paso 1 layout`).
     - Parent spot check: `dotnet test V2/PapaPersonas.sln -c Release --no-build` passed again with 1 passed, 0 failed, and 0 skipped.
+    - Operator visual review: approved from the supplied running-application screenshot; layout, labels, disabled future controls, splitter, and activity area were accepted without requested changes.
     - Next step: review the Solapa 1 visuals before adding dynamic column detection; do not add cleaning behavior in this work unit.
 
 - [ ] **V2L-004 — Add dynamic column discovery and selection**
@@ -107,4 +108,4 @@ The current application contains a cumulative master-database workflow that is n
 
 ## Progress and Next Step
 
-`V2L-001`, `V2L-002`, and `V2L-003` are complete. The next authorized step is visual review of Solapa 1 before adding dynamic column detection.
+`V2L-001`, `V2L-002`, and `V2L-003` are complete, including operator visual approval. Await explicit authorization before starting `V2L-004` dynamic column discovery.
