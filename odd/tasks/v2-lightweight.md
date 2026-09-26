@@ -133,6 +133,7 @@ The current application contains a cumulative master-database workflow that is n
     - Commit: `0eec9ff` (`feat(v2): show header detection progress`).
     - Parent spot check: `dotnet test V2/PapaPersonas.sln -c Release --no-build` passed again with 4 passed, 0 failed, and 0 skipped.
     - Independent verification: PASS; confirmed the diff only adds busy feedback and documentation, with 0 build warnings/errors and 4 passing tests.
+    - Operator manual acceptance: passed with a real workbook; the loading text and indeterminate progress bar were clearly visible during header detection and disappeared correctly afterward.
 
 ## Confirmed Future Cleaning Semantics
 
@@ -144,4 +145,4 @@ The current application contains a cumulative master-database workflow that is n
 
 ## Progress and Next Step
 
-`V2L-001` through `V2L-006` are complete, with V2L-004 manually accepted on a real workbook. The next step is visual/manual review of the V2L-006 indicator before any cleaning or TXT export work. TXT log export and cleaning remain future tasks.
+`V2L-001` through `V2L-006` are complete and manually accepted. Solapa 1 now selects a workbook, prepares the rejected folder, detects headers, populates both selectors, logs activity, and shows visible work progress. Cleaning and TXT log export remain future tasks requiring explicit authorization.
