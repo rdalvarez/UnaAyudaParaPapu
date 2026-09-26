@@ -73,19 +73,20 @@ The current application contains a cumulative master-database workflow that is n
   - Acceptance: V2 builds, tests pass, and the application launches with the expected tabs and controls.
   - Checks: focused tests, Release build, and a runtime launch/readback scenario.
   - Rollback boundary: `V2/` scaffold only.
-   - Evidence:
-     - `dotnet restore V2/PapaPersonas.sln`: passed; all three V2 projects restored successfully.
-     - `dotnet build V2/PapaPersonas.sln -c Release --no-restore`: passed; 0 warnings, 0 errors.
-     - `dotnet test V2/PapaPersonas.sln -c Release --no-build`: passed; 1 passed, 0 failed, 0 skipped.
-     - Structural XAML readback: passed; four tabs are present in the requested order, only the first is enabled, all requested Paso 1 controls are present, and the V2 XAML contains no DuckDB reference.
-     - Runtime harness: passed; the V2 Release executable remained active after launch, exposed a main window, closed through `CloseMainWindow()`, exited with code 0, and did not require forced termination.
-     - Rollback boundary: remove `V2/` only; V1 behavior and files are outside this work unit.
-     - RDD risk: `disabled/unmanaged`.
-     - Commit: `4cff920` (`feat(v2): scaffold tabbed shell and Paso 1 interface`).
-     - Bounded correction evidence: `MainWindow` now consumes `TabCatalog.All` by applying title and enabled state to named tabs in catalog order, with a fail-fast count check. The Limpieza group now uses two responsive action rows with `170`, `*`, and `Auto` columns; all selectors and buttons remain disabled.
-     - Correction verification: Release build, focused test suite, and V2 runtime harness passed after the correction. No V1 files or behavior changed.
-     - Correction commit: this work-unit correction commit (`fix(v2): bind shell tabs and improve Paso 1 layout`).
-     - Next step: review the Solapa 1 visuals before adding dynamic column detection; do not add cleaning behavior in this work unit.
+  - Evidence:
+    - `dotnet restore V2/PapaPersonas.sln`: passed; all three V2 projects restored successfully.
+    - `dotnet build V2/PapaPersonas.sln -c Release --no-restore`: passed; 0 warnings, 0 errors.
+    - `dotnet test V2/PapaPersonas.sln -c Release --no-build`: passed; 1 passed, 0 failed, 0 skipped.
+    - Structural XAML readback: passed; four tabs are present in the requested order, only the first is enabled, all requested Paso 1 controls are present, and the V2 XAML contains no DuckDB reference.
+    - Runtime harness: passed; the V2 Release executable remained active after launch, exposed a main window, closed through `CloseMainWindow()`, exited with code 0, and did not require forced termination.
+    - Rollback boundary: remove `V2/` only; V1 behavior and files are outside this work unit.
+    - RDD risk: `disabled/unmanaged`.
+    - Commit: `4cff920` (`feat(v2): scaffold tabbed shell and Paso 1 interface`).
+    - Bounded correction evidence: `MainWindow` now consumes `TabCatalog.All` by applying title and enabled state to named tabs in catalog order, with a fail-fast count check. The Limpieza group now uses two responsive action rows with `170`, `*`, and `Auto` columns; all selectors and buttons remain disabled.
+    - Correction verification: Release build, focused test suite, and V2 runtime harness passed after the correction. No V1 files or behavior changed.
+    - Correction commit: `ee1b0a4` (`fix(v2): bind shell tabs and improve Paso 1 layout`).
+    - Parent spot check: `dotnet test V2/PapaPersonas.sln -c Release --no-build` passed again with 1 passed, 0 failed, and 0 skipped.
+    - Next step: review the Solapa 1 visuals before adding dynamic column detection; do not add cleaning behavior in this work unit.
 
 - [ ] **V2L-004 — Add dynamic column discovery and selection**
   - Route: delegated direct.
