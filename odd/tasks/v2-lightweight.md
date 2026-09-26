@@ -110,12 +110,27 @@ The current application contains a cumulative master-database workflow that is n
     - Correction commit: `ed9af71` (`fix(v2): harden Paso 1 column discovery`).
     - Independent verification: build and 4 tests passed; functional scope and state handling passed. The verifier initially blocked because activity logs include the selected file name and complete rejected-folder path.
     - Operator decision: full local paths and file names are intentionally retained in the activity log for this personal application because diagnostic value for future support outweighs local metadata exposure. The paths are not persisted or transmitted by V2L-004.
+    - Operator manual acceptance: passed with a real workbook; input path, automatic `rech` folder creation, clickable folder access, complete detected-column list, and both column selectors worked as expected.
 
 - [ ] **V2L-005 — Save the activity log as a TXT file**
   - Route: delegated direct if implementation touches UI, dialog, logging, and tests; otherwise reassess after visual design.
   - Scope: add a footer action beside the V2 status that saves the complete current activity log to a user-selected TXT file for support. Do not implement it until explicitly authorized.
   - Acceptance: exported text preserves the on-screen log content and order, reports cancellation/failure clearly, and does not alter the active cleaning state.
   - Evidence: pending.
+
+- [x] **V2L-006 — Show visible work progress in Paso 1**
+  - Route: direct bounded implementation.
+  - Scope: while header detection runs, show an indeterminate progress bar and a short status such as `Leyendo encabezados...`; hide both after success or failure. Reuse the existing busy boundary without adding cancellation, percentages, or new processing logic.
+  - Acceptance: the indicator becomes visible before background work starts, remains visible while controls are disabled, and is always hidden when the operation completes or fails.
+  - Evidence:
+     - `dotnet build V2/PapaPersonas.sln -c Release --no-restore`: passed; 0 warnings, 0 errors.
+     - `dotnet test V2/PapaPersonas.sln -c Release --no-build`: passed; 4 passed, 0 failed, 0 skipped.
+     - XAML/code-behind readback: passed; the indicator is `Collapsed` by default, its `ProgressBar` is indeterminate, its text is `Leyendo encabezados...`, and `SetBusy(true)`/`SetBusy(false)` show and hide it. The existing `finally` calls `SetBusy(false)`, restoring the hidden state after success, error, or exception exit. Accessibility names and a polite live setting are present.
+     - Runtime harness: passed; the V2 Release executable started, exposed the main window, closed cleanly, and exited with code 0.
+     - Manual acceptance carried forward from V2L-004: passed with a real workbook; input path, automatic `rech` folder creation, clickable folder access, complete detected-column list, and both column selectors worked as expected.
+     - Rollback boundary: remove the V2 header-reading indicator and its README/ODD evidence changes; V1 and V2L-004 behavior remain outside the boundary.
+     - RDD risk: `disabled/unmanaged`.
+    - Commit: pending until verification and staging are complete.
 
 ## Confirmed Future Cleaning Semantics
 
@@ -127,4 +142,4 @@ The current application contains a cumulative master-database workflow that is n
 
 ## Progress and Next Step
 
-`V2L-001`, `V2L-002`, `V2L-003`, and `V2L-004` are complete within their bounded scopes. Full local paths in activity logs are an explicit operator choice. Next: visual/manual review with a user-selected workbook before implementing cleaning; TXT log export remains a future task.
+`V2L-001` through `V2L-006` are complete, with V2L-004 manually accepted on a real workbook. The next step is visual/manual review of the V2L-006 indicator before any cleaning or TXT export work. TXT log export and cleaning remain future tasks.

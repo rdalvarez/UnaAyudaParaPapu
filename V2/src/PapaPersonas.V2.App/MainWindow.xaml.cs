@@ -122,6 +122,7 @@ public partial class MainWindow : Window
 
     private void SetBusy(bool isBusy)
     {
+        HeaderReadingProgressPanel.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
         BrowseFileButton.IsEnabled = !isBusy;
         BrowseFolderButton.IsEnabled = !isBusy;
         RejectedFolderLabel.IsEnabled = !isBusy;
