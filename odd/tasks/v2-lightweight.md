@@ -47,9 +47,12 @@ The current application contains a cumulative master-database workflow that is n
      - `dotnet test V1/PapaPersonas.sln -c Release --no-build`: passed; 357 passed, 0 failed, 0 skipped.
      - Structural readback confirmed `V1/PapaPersonas.sln`, `V1/src/`, `V1/tests/`, `V1/config/`, `V1/docs/`, `V1/SPEC_V1.md`, `V1/openspec/`, and the faithful `V1/README.md` copy. Root `README.md` remains in place.
      - `git diff --summary`: tracked V1 assets detected as renames into `V1/`; no ignored local outputs, artifacts, or real data were moved or modified.
-     - Runtime harness: `N/A` — this work unit only relocates bytes without changing behavior; build plus the complete test suite are the applicable functional verification.
-     - RDD risk: `disabled/unmanaged` — verified off by default for this session.
-     - Commit: `7e42ad272a0b3258f5af8296233a4fcc8d137f7a` (`refactor(repo): move existing application into V1`).
+      - Runtime harness: `N/A` — this work unit only relocates bytes without changing behavior; build plus the complete test suite are the applicable functional verification.
+      - RDD risk: `disabled/unmanaged` — verified off by default for this session.
+      - Commit: `7e42ad272a0b3258f5af8296233a4fcc8d137f7a` (`refactor(repo): move existing application into V1`).
+      - Evidence commit: `6df927544c7517667ece214e359a4f18286746d6` (`docs(odd): record V1 relocation evidence`).
+      - Parent spot check: `dotnet test V1/PapaPersonas.sln -c Release --no-build` passed again with 357 passed, 0 failed, and 0 skipped.
+      - Independent verification: PASS. Git reported 229 `R100`/`C100` entries plus this ODD document; blob comparison found 0 mismatches, and an independent Release build passed with 0 warnings and 0 errors.
 
 - [ ] **V2L-002 — Create repository landing documentation**
   - Route: inline if limited to the root README; otherwise delegated.
@@ -87,4 +90,4 @@ The current application contains a cumulative master-database workflow that is n
 
 ## Progress and Next Step
 
-Current step: execute and verify `V2L-001` only. Do not begin V2 implementation until the V1 relocation commit is complete and verified.
+`V2L-001` is complete and independently verified. Await explicit continuation before starting `V2L-002` or creating V2 files.
