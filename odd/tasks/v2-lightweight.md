@@ -89,14 +89,23 @@ The current application contains a cumulative master-database workflow that is n
     - Operator visual review: approved from the supplied running-application screenshot; layout, labels, disabled future controls, splitter, and activity area were accepted without requested changes.
     - Next step: review the Solapa 1 visuals before adding dynamic column detection; do not add cleaning behavior in this work unit.
 
-- [ ] **V2L-004 — Add dynamic column discovery and selection**
-  - Route: delegated direct.
+- [x] **V2L-004 — Add dynamic column discovery and selection**
+  - Route: direct bounded implementation.
   - Trigger evidence: coordinated UI, Excel-reading, state, and test changes across multiple files.
-  - Scope: display detected columns and allow one selected column per cleaning action; do not implement duplicate or empty-row removal yet.
-  - Acceptance: arbitrary header names appear in the interface and can be selected without fixed aliases.
-  - Checks: focused tests, Release build, and a representative workbook scenario.
+  - Scope: enable Excel selection, create/display the rejected-folder path, read headers off the UI thread, normalize dynamic presentation names, populate independent selectors, and expose newest-first operational activity. Duplicate removal, empty-value removal, export, Sergio, DuckDB, and row materialization remain disabled.
+  - Acceptance: arbitrary header names appear in the interface and can be selected without fixed aliases; cancellation and failures preserve coherent prior UI state.
+  - Checks: restore, Release build, focused tests, structural readback, runtime launch/close harness, and synthetic header normalization tests.
   - Rollback boundary: V2 column-discovery and selection behavior only.
-  - Evidence: pending.
+  - Evidence:
+    - `dotnet restore V2/PapaPersonas.sln`: passed; all three V2 projects restored.
+    - `dotnet build V2/PapaPersonas.sln -c Release --no-restore`: passed; 0 warnings, 0 errors.
+    - `dotnet test V2/PapaPersonas.sln -c Release --no-build`: passed; 4 passed, 0 failed, 0 skipped.
+    - Structural readback: passed; Browse file enabled with Excel filter, rejected-folder label is clickable/styled, folder override is present, both combos share detected-column items while remaining independent, three processing actions remain disabled, and no DuckDB/Sergio/cleaning logic was added.
+    - Runtime harness: passed; Release V2 executable started, exposed a main window, closed cleanly, and exited with code 0.
+    - Synthetic header scenario: passed through test-only in-memory normalization coverage for ordered, empty, repeated case-insensitive headers and unique positional identities. No real workbook or personal data was used.
+    - Rollback boundary: V2 column discovery, folder selection, activity, and selector behavior in `V2/` only.
+    - RDD risk: `disabled/unmanaged`.
+    - Commit: pending until final verification and staging.
 
 ## Confirmed Future Cleaning Semantics
 
@@ -108,4 +117,4 @@ The current application contains a cumulative master-database workflow that is n
 
 ## Progress and Next Step
 
-`V2L-001`, `V2L-002`, and `V2L-003` are complete, including operator visual approval. Await explicit authorization before starting `V2L-004` dynamic column discovery.
+`V2L-001`, `V2L-002`, `V2L-003`, and `V2L-004` are complete within their bounded scopes. Next: visual/manual review with a user-selected workbook before implementing any cleaning behavior.
