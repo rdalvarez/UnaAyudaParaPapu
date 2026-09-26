@@ -81,7 +81,10 @@ The current application contains a cumulative master-database workflow that is n
      - Runtime harness: passed; the V2 Release executable remained active after launch, exposed a main window, closed through `CloseMainWindow()`, exited with code 0, and did not require forced termination.
      - Rollback boundary: remove `V2/` only; V1 behavior and files are outside this work unit.
      - RDD risk: `disabled/unmanaged`.
-     - Commit: pending until final inspection and staging.
+     - Commit: `4cff920` (`feat(v2): scaffold tabbed shell and Paso 1 interface`).
+     - Bounded correction evidence: `MainWindow` now consumes `TabCatalog.All` by applying title and enabled state to named tabs in catalog order, with a fail-fast count check. The Limpieza group now uses two responsive action rows with `170`, `*`, and `Auto` columns; all selectors and buttons remain disabled.
+     - Correction verification: Release build, focused test suite, and V2 runtime harness passed after the correction. No V1 files or behavior changed.
+     - Correction commit: this work-unit correction commit (`fix(v2): bind shell tabs and improve Paso 1 layout`).
      - Next step: review the Solapa 1 visuals before adding dynamic column detection; do not add cleaning behavior in this work unit.
 
 - [ ] **V2L-004 — Add dynamic column discovery and selection**
@@ -103,4 +106,4 @@ The current application contains a cumulative master-database workflow that is n
 
 ## Progress and Next Step
 
-`V2L-001` and `V2L-002` are complete. The next authorized work unit is `V2L-003`: create the independent V2 shell without cleaning logic.
+`V2L-001`, `V2L-002`, and `V2L-003` are complete. The next authorized step is visual review of Solapa 1 before adding dynamic column detection.

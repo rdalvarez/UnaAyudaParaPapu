@@ -21,7 +21,7 @@
         </Border>
 
         <TabControl Grid.Row="2">
-            <TabItem Header="Preparar archivo de Hernán" IsEnabled="True">
+            <TabItem x:Name="PrepararTab">
                 <Grid Margin="6">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*" />
@@ -52,15 +52,15 @@
 
                             <GroupBox Header="Limpieza (no disponible en esta fase)" Padding="10" Margin="0,12,0,0">
                                 <Grid>
-                                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="170" /><ColumnDefinition Width="220" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="170" /><ColumnDefinition Width="220" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="170" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                     <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Duplicados" />
                                     <ComboBox Grid.Row="0" Grid.Column="1" Margin="8,4" IsEnabled="False" AutomationProperties.Name="Columna para duplicados" />
                                     <Button Grid.Row="0" Grid.Column="2" Margin="8,4" Content="Quitar duplicados" IsEnabled="False" />
-                                    <TextBlock Grid.Row="0" Grid.Column="3" Margin="18,0,0,0" VerticalAlignment="Center" Text="Valores vacíos" />
-                                    <ComboBox Grid.Row="0" Grid.Column="4" Margin="8,4" IsEnabled="False" AutomationProperties.Name="Columna para vacíos" />
-                                    <Button Grid.Row="0" Grid.Column="5" Margin="8,4" Content="Quitar valores vacíos" IsEnabled="False" />
-                                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="6" Margin="0,8,0,0" Foreground="#FF777777" Text="La detección, selección y limpieza se habilitarán después de esta maqueta." />
+                                    <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Valores vacíos" />
+                                    <ComboBox Grid.Row="1" Grid.Column="1" Margin="8,4" IsEnabled="False" AutomationProperties.Name="Columna para vacíos" />
+                                    <Button Grid.Row="1" Grid.Column="2" Margin="8,4" Content="Quitar valores vacíos" IsEnabled="False" />
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,8,0,0" Foreground="#FF777777" Text="La detección, selección y limpieza se habilitarán después de esta maqueta." />
                                 </Grid>
                             </GroupBox>
 
@@ -76,9 +76,9 @@
                     </GroupBox>
                 </Grid>
             </TabItem>
-            <TabItem Header="Ingresar archivo de Sergio" IsEnabled="False"><TextBlock Margin="12" Text="Disponible en una fase futura." /></TabItem>
-            <TabItem Header="Generación y consulta de stock" IsEnabled="False"><TextBlock Margin="12" Text="Disponible en una fase futura." /></TabItem>
-            <TabItem Header="Consultas (opcional)" IsEnabled="False"><TextBlock Margin="12" Text="Disponible en una fase futura." /></TabItem>
+            <TabItem x:Name="SergioTab"><TextBlock Margin="12" Text="Disponible en una fase futura." /></TabItem>
+            <TabItem x:Name="StockTab"><TextBlock Margin="12" Text="Disponible en una fase futura." /></TabItem>
+            <TabItem x:Name="ConsultasTab"><TextBlock Margin="12" Text="Disponible en una fase futura." /></TabItem>
         </TabControl>
 
         <Border Grid.Row="4" Padding="8" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFF9F9F9">
