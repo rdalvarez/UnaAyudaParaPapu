@@ -49,7 +49,7 @@ The current application contains a cumulative master-database workflow that is n
      - `git diff --summary`: tracked V1 assets detected as renames into `V1/`; no ignored local outputs, artifacts, or real data were moved or modified.
      - Runtime harness: `N/A` — this work unit only relocates bytes without changing behavior; build plus the complete test suite are the applicable functional verification.
      - RDD risk: `disabled/unmanaged` — verified off by default for this session.
-     - Commit planned: pending before commit.
+     - Commit: `7e42ad272a0b3258f5af8296233a4fcc8d137f7a` (`refactor(repo): move existing application into V1`).
 
 - [ ] **V2L-002 — Create repository landing documentation**
   - Route: inline if limited to the root README; otherwise delegated.
