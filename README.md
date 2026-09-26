@@ -7,7 +7,7 @@ PapaPersonas is a local Windows desktop application maintained in two independen
 | Version | Status | Purpose |
 | --- | --- | --- |
 | [V1](V1/README.md) | Stable | Existing application with the cumulative DuckDB master database and the implemented Hernán, Sergio, query, stock, and maintenance workflows. |
-| V2 | In development | Lighter application built incrementally around flexible file cleaning and non-cumulative processing. |
+| [V2](V2/README.md) | In development | Lighter application built incrementally around flexible file cleaning and non-cumulative processing. |
 
 ## Current development path
 

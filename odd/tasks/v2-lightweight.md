@@ -66,14 +66,23 @@ The current application contains a cumulative master-database workflow that is n
     - Repository paths in the V1 quick-start commands match the verified relocated solution.
     - Structural readback and Markdown path checks passed.
 
-- [ ] **V2L-003 — Scaffold the independent V2 shell**
+- [x] **V2L-003 — Scaffold the independent V2 shell**
   - Route: delegated direct.
   - Trigger evidence: creation of multiple non-trivial WPF, project, and test files.
   - Scope: independent `V2/PapaPersonas.sln`, tabbed shell, Paso 1 interface shell, and disabled placeholders for later modules; no cleaning engine.
   - Acceptance: V2 builds, tests pass, and the application launches with the expected tabs and controls.
   - Checks: focused tests, Release build, and a runtime launch/readback scenario.
   - Rollback boundary: `V2/` scaffold only.
-  - Evidence: pending.
+   - Evidence:
+     - `dotnet restore V2/PapaPersonas.sln`: passed; all three V2 projects restored successfully.
+     - `dotnet build V2/PapaPersonas.sln -c Release --no-restore`: passed; 0 warnings, 0 errors.
+     - `dotnet test V2/PapaPersonas.sln -c Release --no-build`: passed; 1 passed, 0 failed, 0 skipped.
+     - Structural XAML readback: passed; four tabs are present in the requested order, only the first is enabled, all requested Paso 1 controls are present, and the V2 XAML contains no DuckDB reference.
+     - Runtime harness: passed; the V2 Release executable remained active after launch, exposed a main window, closed through `CloseMainWindow()`, exited with code 0, and did not require forced termination.
+     - Rollback boundary: remove `V2/` only; V1 behavior and files are outside this work unit.
+     - RDD risk: `disabled/unmanaged`.
+     - Commit: pending until final inspection and staging.
+     - Next step: review the Solapa 1 visuals before adding dynamic column detection; do not add cleaning behavior in this work unit.
 
 - [ ] **V2L-004 — Add dynamic column discovery and selection**
   - Route: delegated direct.
