@@ -105,8 +105,17 @@ The current application contains a cumulative master-database workflow that is n
     - Synthetic header scenario: passed through test-only in-memory normalization coverage for ordered, empty, repeated case-insensitive headers and unique positional identities. No real workbook or personal data was used.
     - Rollback boundary: V2 column discovery, folder selection, activity, and selector behavior in `V2/` only.
     - RDD risk: `disabled/unmanaged`.
-    - Commit: `fix(v2): harden Paso 1 column discovery` (hash reported by final git readback).
+    - Main commit: `ef41407` (`feat(v2): detect workbook columns in Paso 1`).
     - Bounded correction: updated Paso 1 copy, named and disabled file/folder controls during asynchronous detection with `finally` restoration, and guarded rejected-folder opening with safe operational logging and a friendly message. Cleaning, export, Sergio, DuckDB, and row processing remain out of scope.
+    - Correction commit: `ed9af71` (`fix(v2): harden Paso 1 column discovery`).
+    - Independent verification: build and 4 tests passed; functional scope and state handling passed. The verifier initially blocked because activity logs include the selected file name and complete rejected-folder path.
+    - Operator decision: full local paths and file names are intentionally retained in the activity log for this personal application because diagnostic value for future support outweighs local metadata exposure. The paths are not persisted or transmitted by V2L-004.
+
+- [ ] **V2L-005 — Save the activity log as a TXT file**
+  - Route: delegated direct if implementation touches UI, dialog, logging, and tests; otherwise reassess after visual design.
+  - Scope: add a footer action beside the V2 status that saves the complete current activity log to a user-selected TXT file for support. Do not implement it until explicitly authorized.
+  - Acceptance: exported text preserves the on-screen log content and order, reports cancellation/failure clearly, and does not alter the active cleaning state.
+  - Evidence: pending.
 
 ## Confirmed Future Cleaning Semantics
 
@@ -118,4 +127,4 @@ The current application contains a cumulative master-database workflow that is n
 
 ## Progress and Next Step
 
-`V2L-001`, `V2L-002`, `V2L-003`, and `V2L-004` are complete within their bounded scopes. Next: visual/manual review with a user-selected workbook before implementing any cleaning behavior.
+`V2L-001`, `V2L-002`, `V2L-003`, and `V2L-004` are complete within their bounded scopes. Full local paths in activity logs are an explicit operator choice. Next: visual/manual review with a user-selected workbook before implementing cleaning; TXT log export remains a future task.
