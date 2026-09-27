@@ -246,7 +246,7 @@ public partial class MainWindow : Window
 
     private void AddActivity(string message)
     {
-        _activityLog.Add(message);
+        _activityLog.Add("Paso 1", message);
         ActivityTextBox.Text = string.Join(Environment.NewLine, _activityLog.Entries);
     }
 

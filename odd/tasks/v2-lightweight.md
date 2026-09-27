@@ -267,8 +267,21 @@ The current application contains a cumulative master-database workflow that is n
     - Completion dialog is owner-centered, accessible, keyboard-default/cancel aware, and opens only the original source directory with `UseShellExecute = true`; open failures show a friendly message without crashing.
     - Runtime harness: bounded launch/close only; visual acceptance and manual representative-workbook execution remain for the operator.
     - Rollback boundary: revert `V2/src/PapaPersonas.V2.App/MainWindow.xaml`, `MainWindow.xaml.cs`, `CompletionDialog.xaml`, `CompletionDialog.xaml.cs`, `V2/README.md`, and this V2L-015 evidence; V2L-014 engine and earlier V2 work remain outside the boundary.
+     - RDD risk: `disabled/unmanaged`.
+     - Commit: pending until verification (`feat(v2): connect cleaning workflow UI`).
+
+- [x] **V2L-016 — Prefix Solapa 1 activity entries with timestamped Paso 1 metadata**
+  - Route: direct bounded implementation.
+  - Scope: make the reusable activity-log model accept a caller-provided section and injectable clock, format every visible entry as `[Paso 1][dd/MM/yyyy HH:mm:ss]Mensaje`, and preserve newest-first ordering. `MainWindow.AddActivity` remains the single UI logging wrapper and passes exactly `Paso 1` for all current entries. No cleaning functionality or cleanup behavior changed.
+  - Acceptance: deterministic tests verify the exact timestamped format and newest-first ordering; structural readback confirms current activity calls flow through the single wrapper and there are no direct activity-log writes without the prefix.
+  - Evidence:
+    - `dotnet build V2/PapaPersonas.sln -c Release --no-restore`: pending in this work unit; required verification command below.
+    - `dotnet test V2/PapaPersonas.sln -c Release --no-build`: pending in this work unit; required verification command below.
+    - Structural readback: `ActivityLog.Add(section, message)` is the only model write, `MainWindow.AddActivity` is the only application wrapper, and it passes exactly `Paso 1`; no cleanup behavior was changed.
+    - Runtime harness: `N/A` — this bounded formatting change has no new runtime boundary; build, tests, and structural readback are the applicable verification.
+    - Rollback boundary: revert `ColumnDiscovery.cs`, `MainWindow.xaml.cs`, `TabCatalogTests.cs`, and this V2L-016 evidence only; cleaning and cleanup behavior remain outside the boundary.
     - RDD risk: `disabled/unmanaged`.
-    - Commit: pending until verification (`feat(v2): connect cleaning workflow UI`).
+    - Commit: pending until verification (`feat(v2): timestamp paso one activity log`).
 
 ## Confirmed Future Cleaning Semantics
 

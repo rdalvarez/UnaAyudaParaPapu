@@ -134,12 +134,21 @@ public sealed class ExcelDataReaderHeaderReader : IHeaderReader
 
 public sealed class ActivityLog
 {
+    private readonly Func<DateTime> _now;
     private readonly List<string> _entries = [];
+
+    public ActivityLog(Func<DateTime>? now = null)
+    {
+        _now = now ?? (() => DateTime.Now);
+    }
 
     public IReadOnlyList<string> Entries => _entries;
 
-    public void Add(string message)
+    public void Add(string section, string message)
     {
-        _entries.Insert(0, message);
+        ArgumentException.ThrowIfNullOrWhiteSpace(section);
+        ArgumentNullException.ThrowIfNull(message);
+
+        _entries.Insert(0, $"[{section}][{_now():dd/MM/yyyy HH:mm:ss}]{message}");
     }
 }

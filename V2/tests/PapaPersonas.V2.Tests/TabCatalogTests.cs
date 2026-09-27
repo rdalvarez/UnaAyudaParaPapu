@@ -44,13 +44,15 @@ public sealed class TabCatalogTests
     }
 
     [Fact]
-    public void ActivityLogIsNewestFirst()
+    public void ActivityLogFormatsTimestampAndIsNewestFirst()
     {
-        var log = new ActivityLog();
-        log.Add("first");
-        log.Add("second");
+        var log = new ActivityLog(() => new DateTime(2026, 9, 27, 14, 5, 6));
+        log.Add("Paso 1", "first");
+        log.Add("Paso 1", "second");
 
-        Assert.Equal(["second", "first"], log.Entries);
+        Assert.Equal(
+            ["[Paso 1][27/09/2026 14:05:06]second", "[Paso 1][27/09/2026 14:05:06]first"],
+            log.Entries);
     }
 
     [Fact]
