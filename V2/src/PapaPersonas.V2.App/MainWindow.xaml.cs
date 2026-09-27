@@ -292,7 +292,7 @@ public partial class MainWindow : Window
             if (presentation.DecisionRequired)
                 _sergioRejectionContinuationAccepted = AskToContinue(presentation);
             else if (presentation.ValidRows == 0)
-                System.Windows.MessageBox.Show(this, "No quedan filas válidas. No se puede continuar ni promover; puede exportar los rechazos.", "Carga de Sergio sin filas válidas", MessageBoxButton.OK, MessageBoxImage.Warning);
+                System.Windows.MessageBox.Show(this, SergioInteractionPolicy.ZeroValidStatusMessage(presentation), "Carga de Sergio sin filas válidas", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         catch (Exception exception)
         {

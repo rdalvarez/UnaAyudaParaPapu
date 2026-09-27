@@ -33,4 +33,9 @@ public static class SergioInteractionPolicy
         $"Filas con clave vacía: {presentation.EmptyRows}. Grupos duplicados: {presentation.DuplicateGroups}. " +
         $"Filas duplicadas: {presentation.DuplicateRows}. Total rechazadas: {presentation.RejectedRows}. " +
         $"Todas las filas rechazadas serán excluidas. ¿Desea continuar?";
+
+    public static string ZeroValidStatusMessage(SergioStagingPresentation presentation) =>
+        presentation.RejectedRows > 0
+            ? "No quedan filas válidas. No se puede continuar ni promover; puede exportar los rechazos."
+            : "El libro no contiene filas de datos. No se puede previsualizar ni promover y no hay nada que exportar.";
 }

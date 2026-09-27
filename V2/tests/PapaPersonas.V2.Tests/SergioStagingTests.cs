@@ -47,6 +47,22 @@ public sealed class SergioStagingTests
     }
 
     [Fact]
+    public void ZeroValidStatusMessageExplainsRejectedRowsCanBeExported()
+    {
+        var presentation = new SergioStagingPresentation("CUIL", 5, 0, 2, 1, 2, 5);
+
+        Assert.Equal("No quedan filas válidas. No se puede continuar ni promover; puede exportar los rechazos.", SergioInteractionPolicy.ZeroValidStatusMessage(presentation));
+    }
+
+    [Fact]
+    public void ZeroValidStatusMessageExplainsEmptyWorkbookHasNothingToExport()
+    {
+        var presentation = new SergioStagingPresentation("CUIL", 0, 0, 0, 0, 0, 0);
+
+        Assert.Equal("El libro no contiene filas de datos. No se puede previsualizar ni promover y no hay nada que exportar.", SergioInteractionPolicy.ZeroValidStatusMessage(presentation));
+    }
+
+    [Fact]
     public void FormatterPreservesStringsAndUsesDeterministicText()
     {
         Assert.Equal("1", SergioCellTextFormatter.Format(1.0));
