@@ -68,6 +68,37 @@ public sealed class ColumnSelectionSettingsTests
     }
 
     [Fact]
+    public void SavePreservesUnknownRootAndPaso1Properties()
+    {
+        var root = CreateRoot();
+        try
+        {
+            var path = Path.Combine(root, "settings.json");
+            File.WriteAllText(path, """
+                {
+                  "configuracionPaso1": {
+                    "columnasDeseleccionadas": ["Old"],
+                    "futurePaso1": { "enabled": true }
+                  },
+                  "configuracionPaso2": { "mode": "future" }
+                }
+                """);
+
+            var store = new ColumnSelectionSettingsStore(path);
+            var result = store.Load();
+            result.Document.ConfiguracionPaso1.DeselectedColumnNames = ["New"];
+            store.Save(result.Document);
+
+            using var saved = JsonDocument.Parse(File.ReadAllText(path));
+            var paso1 = saved.RootElement.GetProperty("configuracionPaso1");
+            Assert.Equal(["New"], paso1.GetProperty("columnasDeseleccionadas").EnumerateArray().Select(item => item.GetString()));
+            Assert.True(paso1.GetProperty("futurePaso1").GetProperty("enabled").GetBoolean());
+            Assert.Equal("future", saved.RootElement.GetProperty("configuracionPaso2").GetProperty("mode").GetString());
+        }
+        finally { DeleteRoot(root); }
+    }
+
+    [Fact]
     public void CorruptSettingsAreReplacedAndReportedAsReset()
     {
         var root = CreateRoot();

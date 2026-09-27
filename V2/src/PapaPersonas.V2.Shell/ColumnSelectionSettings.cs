@@ -7,12 +7,18 @@ public sealed class ColumnSelectionSettingsDocument
 {
     [JsonPropertyName("configuracionPaso1")]
     public Paso1ColumnSelectionSettings ConfiguracionPaso1 { get; set; } = new();
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement> ExtensionData { get; set; } = [];
 }
 
 public sealed class Paso1ColumnSelectionSettings
 {
     [JsonPropertyName("columnasDeseleccionadas")]
     public List<string> DeselectedColumnNames { get; set; } = [];
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement> ExtensionData { get; set; } = [];
 }
 
 public sealed record ColumnSelectionSettingsLoadResult(
@@ -76,14 +82,9 @@ public sealed class ColumnSelectionSettingsStore
         var temporaryPath = _path + ".tmp-" + Guid.NewGuid().ToString("N");
         try
         {
-            var normalized = new ColumnSelectionSettingsDocument
-            {
-                ConfiguracionPaso1 = new Paso1ColumnSelectionSettings
-                {
-                    DeselectedColumnNames = NormalizeNames(document.ConfiguracionPaso1?.DeselectedColumnNames ?? [])
-                }
-            };
-            File.WriteAllText(temporaryPath, JsonSerializer.Serialize(normalized, JsonOptions));
+            document.ConfiguracionPaso1 ??= new Paso1ColumnSelectionSettings();
+            document.ConfiguracionPaso1.DeselectedColumnNames = NormalizeNames(document.ConfiguracionPaso1.DeselectedColumnNames ?? []);
+            File.WriteAllText(temporaryPath, JsonSerializer.Serialize(document, JsonOptions));
             File.Move(temporaryPath, _path, true);
         }
         finally

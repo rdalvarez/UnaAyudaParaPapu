@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     private readonly CleaningPlan _cleaningPlan = new();
     private readonly CleaningExecutionCoordinator _executionCoordinator = new();
     private readonly ColumnSelectionSettingsStore _columnSelectionSettings = new();
+    private ColumnSelectionSettingsDocument _columnSelectionDocument = new();
     private string? _rejectedFolderPath;
     private IReadOnlyList<string?> _rawHeaders = [];
     private IReadOnlyList<OutputColumnSelection> _outputColumns = [];
@@ -79,6 +80,7 @@ public partial class MainWindow : Window
             });
             var rawHeaders = loadedSettings.Item1;
             var columns = HeaderPresentation.Normalize(rawHeaders);
+            _columnSelectionDocument = loadedSettings.Item2.Document;
 
             InputFileTextBox.Text = path;
             RejectedFolderTextBox.Text = rejectedFolder;
@@ -263,13 +265,8 @@ public partial class MainWindow : Window
                 column => _outputColumns.First(item => item.Column == column).IsSelected);
             try
             {
-                _columnSelectionSettings.Save(new ColumnSelectionSettingsDocument
-                {
-                    ConfiguracionPaso1 = new Paso1ColumnSelectionSettings
-                    {
-                        DeselectedColumnNames = deselectedNames.ToList()
-                    }
-                });
+                _columnSelectionDocument.ConfiguracionPaso1.DeselectedColumnNames = deselectedNames.ToList();
+                _columnSelectionSettings.Save(_columnSelectionDocument);
                 AddActivity($"Configuración de columnas guardada: {_columnSelectionSettings.Path}");
             }
             catch (Exception settingsException)
