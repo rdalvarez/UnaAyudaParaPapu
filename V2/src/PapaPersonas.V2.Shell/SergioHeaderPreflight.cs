@@ -21,6 +21,7 @@ public sealed record SergioHeaderPreflightResult(
 {
     public bool HasIssues => Columns.Any(column => column.IssueKind != SergioHeaderIssueKind.None);
     public int DuplicateOccurrenceCount => DuplicateGroups.Sum(group => Math.Max(0, group.Count - 1));
+    public bool HasReservedTechnicalAlias => Columns.Any(column => string.Equals(column.ProposedAlias, SergioSchemaNames.RejectionReason, StringComparison.Ordinal));
 }
 
 public static class SergioHeaderPreflight
@@ -91,7 +92,7 @@ public static class SergioPrimaryKeySelection
     {
         ArgumentNullException.ThrowIfNull(columns);
 
-        var aliases = columns.Select(column => column.ProposedAlias).ToArray();
+        var aliases = columns.Select(column => column.ProposedAlias).Where(alias => !string.Equals(alias, SergioSchemaNames.RejectionReason, StringComparison.Ordinal)).ToArray();
         var available = new HashSet<string>(aliases, StringComparer.Ordinal);
         var ordered = new List<string>(aliases.Length);
 

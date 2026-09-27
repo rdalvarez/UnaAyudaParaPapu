@@ -72,6 +72,34 @@ public sealed class SergioStagingTests
     }
 
     [Fact]
+    public void ExactReservedSourceColumnIsReusedAndItsValuesAreIgnored()
+    {
+        using var workspace = new TestWorkspace();
+        var workbook = workspace.CreateWorkbook(["CUIL", SergioSchemaNames.RejectionReason, "__pp_motivo_rechazo_1"], [["20-1", "source", "business"]]);
+        var analyzer = new SergioStagingAnalyzer(new DuckDbPathPolicy(workspace.DatabasePath));
+
+        var result = analyzer.Analyze(new SergioStagingRequest(workbook, SergioHeaderPreflight.Analyze(["CUIL", SergioSchemaNames.RejectionReason, "__pp_motivo_rechazo_1"]), "CUIL"));
+
+        Assert.Equal(["CUIL", "__pp_motivo_rechazo_1"], result.Aliases);
+        Assert.Equal(SergioSchemaNames.RejectionReason, result.TechnicalReasonColumnName);
+        using var verify = Open(workspace.DatabasePath);
+        Assert.Equal(1, CountColumns(verify, result.CandidateTableName, SergioSchemaNames.RejectionReason));
+        Assert.Null(ReadNullableValue(verify, result.CandidateTableName, SergioSchemaNames.RejectionReason));
+        Assert.Equal("business", ReadValue(verify, result.CandidateTableName, "__pp_motivo_rechazo_1"));
+        analyzer.Cleanup(result.CandidateTableName);
+    }
+
+    [Fact]
+    public void ReservedPrimaryKeyRequestIsRejected()
+    {
+        using var workspace = new TestWorkspace();
+        var workbook = workspace.CreateWorkbook(["CUIL", SergioSchemaNames.RejectionReason], [["20-1", "source"]]);
+        var analyzer = new SergioStagingAnalyzer(new DuckDbPathPolicy(workspace.DatabasePath));
+
+        Assert.Throws<SergioStagingException>(() => analyzer.Analyze(new SergioStagingRequest(workbook, SergioHeaderPreflight.Analyze(["CUIL", SergioSchemaNames.RejectionReason]), SergioSchemaNames.RejectionReason)));
+    }
+
+    [Fact]
     public void DuplicateAliasCanBeSelectedAsPrimaryKeyIndependently()
     {
         using var workspace = new TestWorkspace();
@@ -267,7 +295,9 @@ public sealed class SergioStagingTests
     private static bool TableExists(DuckDBConnection connection, string name) { using var command = connection.CreateCommand(); command.CommandText = "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?"; command.Parameters.Add(new DuckDBParameter { Value = name }); return Convert.ToInt64(command.ExecuteScalar()) > 0; }
     private static long CountRows(DuckDBConnection connection, string table) { using var command = connection.CreateCommand(); command.CommandText = $"SELECT COUNT(*) FROM \"{table}\""; return Convert.ToInt64(command.ExecuteScalar()); }
     private static long CountReason(DuckDBConnection connection, string table, string column, string reason) { using var command = connection.CreateCommand(); command.CommandText = $"SELECT COUNT(*) FROM \"{table}\" WHERE \"{column}\" = ?"; command.Parameters.Add(new DuckDBParameter { Value = reason }); return Convert.ToInt64(command.ExecuteScalar()); }
+    private static long CountColumns(DuckDBConnection connection, string table, string column) { using var command = connection.CreateCommand(); command.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = ? AND column_name = ?"; command.Parameters.Add(new DuckDBParameter { Value = table }); command.Parameters.Add(new DuckDBParameter { Value = column }); return Convert.ToInt64(command.ExecuteScalar()); }
     private static string ReadValue(DuckDBConnection connection, string table, string column = "value") { using var command = connection.CreateCommand(); command.CommandText = $"SELECT \"{column}\" FROM \"{table}\" LIMIT 1"; return (string)command.ExecuteScalar()!; }
+    private static string? ReadNullableValue(DuckDBConnection connection, string table, string column) { using var command = connection.CreateCommand(); command.CommandText = $"SELECT \"{column}\" FROM \"{table}\" LIMIT 1"; return command.ExecuteScalar() as string; }
     private static (string CandidateTableName, string Workbook) Stage(TestWorkspace workspace, SergioStagingAnalyzer analyzer, string fileName, string value)
     {
         var workbook = workspace.CreateWorkbook(fileName, ["CUIL"], [[value]]);

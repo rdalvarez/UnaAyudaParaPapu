@@ -109,4 +109,13 @@ public sealed class SergioHeaderPreflightTests
 
         Assert.Equal(["CUIL", "DNI", "CUIL (1)", "CUIL (1) (1)"], SergioPrimaryKeySelection.Options(result.Columns));
     }
+
+    [Fact]
+    public void PrimaryKeyOptionsExcludeReservedTechnicalAlias()
+    {
+        var result = SergioHeaderPreflight.Analyze(["CUIL", SergioSchemaNames.RejectionReason, "__pp_motivo_rechazo_1"]);
+
+        Assert.Equal(["CUIL", "__pp_motivo_rechazo_1"], SergioPrimaryKeySelection.Options(result.Columns));
+        Assert.True(result.HasReservedTechnicalAlias);
+    }
 }

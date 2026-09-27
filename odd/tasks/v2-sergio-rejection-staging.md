@@ -12,7 +12,7 @@ The current Sergio flow drops the entire candidate when the selected primary key
 
 - Work only in PapaPersonas V2 on `feat/v2-lightweight`.
 - Preserve every imported row in the candidate staging table.
-- Add a collision-safe technical rejection-reason column.
+- Reserve the exact technical rejection-reason column `__pp_motivo_rechazo`; if accepted aliases already contain it, reuse that one column, ignore source values, and recalculate reasons.
 - Classify `NULL` or `TRIM(key) = ''` as `CLAVE_VACIA`.
 - Classify every row in a non-empty duplicate `TRIM(key)` group as `CLAVE_DUPLICADA`; never choose an arbitrary survivor.
 - Show the selected key column and counts for total, valid, empty-key, duplicate-group, and duplicate rows.
@@ -26,7 +26,7 @@ The current Sergio flow drops the entire candidate when the selected primary key
 ## Constraints
 
 - All source/business staging columns remain `VARCHAR`; the technical reason column is nullable `VARCHAR`.
-- Technical identifiers must be generated collision-safe against accepted aliases.
+- `__pp_motivo_rechazo` is canonical; use exact-name checks only. Near-prefix aliases remain business columns.
 - Rejection matching remains case-sensitive and applies only `TRIM()`, consistent with the current contract.
 - Empty keys are classified before duplicate detection and receive one reason.
 - If no valid rows remain, promotion is disabled; export and cancel remain available.
@@ -39,9 +39,9 @@ The current Sergio flow drops the entire candidate when the selected primary key
 ## Tasks
 
 - [x] **SRJ-001 — Retain and classify every staging row**
-  - Route: direct implementation because staging SQL, candidate ownership, metrics, tests, and task evidence span multiple non-trivial files.
-  - Acceptance: candidate retains every row; technical reason alias is collision-safe; empty keys and every member of duplicate groups are classified; metrics include valid rows; rejected candidates are retained rather than dropped; zero-valid state is explicit.
-  - Checks: real temporary DuckDB tests cover mixed empty/duplicate/valid rows, duplicate-group membership, candidate retention, collision-safe reason alias, and unrelated-table preservation. Release build and full V2 tests pass (73/73); `git diff --check` passes. Structural readback confirms V2-only changes, all rows retained, parameterized `CLAVE_VACIA` then `CLAVE_DUPLICADA` classification, and promoter rejection guard.
+  - Route: delegated direct because staging SQL, candidate ownership, metrics, tests, UI warning, and task evidence span multiple non-trivial files.
+  - Acceptance: candidate retains every row; exactly one canonical technical reason column is present; an accepted exact-name source column is reused with source values ignored and reasons recalculated; near-prefix aliases remain business columns; empty keys and every member of duplicate groups are classified; metrics include valid rows; rejected candidates are retained rather than dropped; zero-valid state is explicit; the reserved column is excluded from PK options, previews, exports, and final business schema.
+  - Checks: real temporary DuckDB tests cover ordinary staging, exact-column reuse/source-value erasure, near-prefix business aliases, reserved PK rejection, mixed empty/duplicate/valid rows, candidate retention, and unrelated-table preservation. Release build and full V2 tests pass; `git diff --check` passes. Structural readback confirms V2-only changes, exact canonical identifier use with no prefix discovery, all rows retained, parameterized `CLAVE_VACIA` then `CLAVE_DUPLICADA` classification, and no source mutation.
   - Rollback: revert only staging classification/result changes, focused tests, and this task evidence.
 
 - [ ] **SRJ-002 — Export rejected rows safely**
@@ -64,4 +64,4 @@ The current Sergio flow drops the entire candidate when the selected primary key
 
 ## Progress
 
-SRJ-001 is complete. Candidate staging retains all rows, adds a nullable collision-safe technical reason column, classifies empty keys before non-empty duplicate groups, and exposes internally consistent metrics including valid rows. `IsValid` retains the compatibility meaning “no rejected rows”; `HasRejections` and `CanPromote` make the safety state explicit, and the current promoter rejects marked candidates. Zero-row candidates are retained but are not valid/promotable. Failures and cancellation still remove the current attempt; `CleanupAll` remains the close-time ownership safety net. RDD remains disabled/unmanaged. Implementation commit: `9f5e1ad`. SRJ-002, SRJ-003, and SRJ-004 remain pending.
+SRJ-001 is complete only if the correction checks pass. Candidate staging retains all rows, uses exactly one canonical `__pp_motivo_rechazo` column, reuses and overwrites an accepted exact-name column with NULL before recalculating reasons, excludes it from business aliases and PK selection, and preserves near-prefix aliases as business data. The UI warns before staging and never modifies the workbook. Correction commit: `fix(v2): reserve sergio rejection reason column` (hash recorded by parent). SRJ-002, SRJ-003, and SRJ-004 remain pending.

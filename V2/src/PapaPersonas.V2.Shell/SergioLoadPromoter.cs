@@ -92,11 +92,11 @@ public sealed class SergioLoadPromoter
             throw new InvalidOperationException("The Sergio candidate is unknown or not owned by this analyzer.");
         aliases = ReadColumns(connection, candidate, transaction);
         if (!aliases.Contains(key, StringComparer.Ordinal)) throw new InvalidOperationException("The selected Sergio primary key is not in the candidate schema.");
-        var technical = aliases.FirstOrDefault(alias => alias.StartsWith("__pp_motivo_rechazo", StringComparison.Ordinal));
+        var technical = aliases.FirstOrDefault(alias => string.Equals(alias, SergioSchemaNames.RejectionReason, StringComparison.Ordinal));
         if (technical is null) throw new InvalidOperationException("The Sergio candidate has no rejection classification column.");
         if (Scalar(connection, $"SELECT COUNT(*) FROM {SergioSql.Quote(candidate)} WHERE {SergioSql.Quote(technical)} IS NOT NULL", transaction) != 0)
             throw new InvalidOperationException("The Sergio candidate contains rejected rows and cannot be promoted.");
-        aliases = aliases.Where(alias => !string.Equals(alias, technical, StringComparison.Ordinal)).ToArray();
+        aliases = aliases.Where(alias => !string.Equals(alias, SergioSchemaNames.RejectionReason, StringComparison.Ordinal)).ToArray();
     }
 
     private static IReadOnlyList<string> ReadColumns(DuckDBConnection c, string table, DuckDBTransaction? tx)

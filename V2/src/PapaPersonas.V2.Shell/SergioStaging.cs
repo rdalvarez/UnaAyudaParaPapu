@@ -105,32 +105,33 @@ public sealed class SergioStagingAnalyzer
         {
             using var cursor = cursorFactory.Open(request.WorkbookPath);
             ValidateHeaders(cursor.Headers, request.AcceptedHeaders);
-            var aliases = request.AcceptedHeaders.Columns.Select(column => column.ProposedAlias).ToArray();
-            var reasonColumn = CreateTechnicalReasonColumnName(aliases);
+            var acceptedAliases = request.AcceptedHeaders.Columns.Select(column => column.ProposedAlias).ToArray();
+            var reasonColumn = SergioSchemaNames.RejectionReason;
+            var schemaAliases = acceptedAliases.Contains(reasonColumn, StringComparer.Ordinal) ? acceptedAliases : [.. acceptedAliases, reasonColumn];
+            var aliases = acceptedAliases.Where(alias => !string.Equals(alias, reasonColumn, StringComparison.Ordinal)).ToArray();
             candidate = CreateCandidateName();
             lock (sync) ownedCandidates.Add(candidate);
             using var connection = Open(databasePath);
             using var transaction = connection.BeginTransaction();
-            Execute(connection, transaction, $"CREATE TABLE {Quote(candidate)} ({string.Join(", ", aliases.Select(alias => $"{Quote(alias)} VARCHAR"))}, {Quote(reasonColumn)} VARCHAR)");
+            Execute(connection, transaction, $"CREATE TABLE {Quote(candidate)} ({string.Join(", ", schemaAliases.Select(alias => $"{Quote(alias)} VARCHAR"))})");
 
             using (var appender = connection.CreateAppender(candidate))
             {
                 while (cursor.Read())
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (cursor.CurrentRow.Count > aliases.Length)
+                    if (cursor.CurrentRow.Count > acceptedAliases.Length)
                         throw new SergioStagingException($"A workbook data row contains more fields than accepted headers.");
 
-                    var values = new object?[aliases.Length];
+                    var values = new object?[schemaAliases.Length];
                     for (var index = 0; index < values.Length; index++)
-                        values[index] = index < cursor.CurrentRow.Count ? SergioCellTextFormatter.Format(cursor.CurrentRow[index]) : null;
+                        values[index] = string.Equals(schemaAliases[index], reasonColumn, StringComparison.Ordinal) ? null : index < cursor.CurrentRow.Count ? SergioCellTextFormatter.Format(cursor.CurrentRow[index]) : null;
                     appender.AppendRow(row =>
                     {
                         foreach (var value in values)
                         {
                             if (value is null) row.AppendNullValue(); else row.AppendValue((string)value);
                         }
-                        row.AppendNullValue();
                     });
                 }
                 appender.Close();
@@ -243,16 +244,6 @@ public sealed class SergioStagingAnalyzer
         return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture) != 0;
     }
 
-    private static string CreateTechnicalReasonColumnName(IReadOnlyCollection<string> aliases)
-    {
-        const string baseName = "__pp_motivo_rechazo";
-        var suffix = 0;
-        string candidate;
-        do candidate = suffix++ == 0 ? baseName : $"{baseName}_{suffix - 1}";
-        while (aliases.Contains(candidate, StringComparer.Ordinal));
-        return candidate;
-    }
-
     private static void ClassifyRows(DuckDBConnection connection, DuckDBTransaction transaction, string table, string key, string reason)
     {
         var qKey = Quote(key);
@@ -298,6 +289,7 @@ public sealed class SergioStagingAnalyzer
         if (columns.Select(column => column.ProposedAlias).Distinct(StringComparer.Ordinal).Count() != columns.Count) throw new SergioStagingException("Accepted Sergio aliases must be globally unique.");
         if (!columns.Select(column => column.Position).OrderBy(position => position).SequenceEqual(Enumerable.Range(0, columns.Count))) throw new SergioStagingException("Accepted Sergio header positions must cover each column exactly once.");
         if (columns.Count(column => string.Equals(column.ProposedAlias, request.SelectedPrimaryKeyAlias, StringComparison.Ordinal)) != 1) throw new SergioStagingException("The selected Sergio primary key must match exactly one accepted alias.");
+        if (string.Equals(request.SelectedPrimaryKeyAlias, SergioSchemaNames.RejectionReason, StringComparison.Ordinal)) throw new SergioStagingException("The reserved Sergio rejection reason column cannot be selected as the primary key.");
     }
 
     private static void ValidateHeaders(IReadOnlyList<string?> actual, SergioHeaderPreflightResult accepted)

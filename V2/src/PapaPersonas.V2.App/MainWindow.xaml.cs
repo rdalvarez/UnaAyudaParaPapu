@@ -169,7 +169,9 @@ public partial class MainWindow : Window
         SergioPrimaryKeyComboBox.ItemsSource = SergioPrimaryKeySelection.Options(result.Columns);
         SergioPrimaryKeyComboBox.SelectedItem = SergioPrimaryKeySelection.DefaultAlias(result.Columns);
         SergioPrimaryKeyComboBox.IsEnabled = true;
-        SergioSummaryTextBlock.Text = "Estado: encabezados aceptados; seleccione la clave primaria y valide.";
+        SergioSummaryTextBlock.Text = result.HasReservedTechnicalAlias
+            ? $"Advertencia: la columna técnica {SergioSchemaNames.RejectionReason} del archivo será ignorada y reutilizada en staging; el archivo original no se modifica. Seleccione la clave primaria y valide."
+            : "Estado: encabezados aceptados; seleccione la clave primaria y valide.";
         UpdateSergioControls();
     }
 
