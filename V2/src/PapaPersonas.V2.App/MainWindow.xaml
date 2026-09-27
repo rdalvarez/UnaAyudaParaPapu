@@ -95,7 +95,7 @@
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel Margin="0,0,6,0">
                             <TextBlock FontSize="18" FontWeight="SemiBold" Text="Ingresar archivo de Sergio" />
-                            <TextBlock Margin="0,4,0,14" Foreground="#FF666666" Text="Seleccione un Excel para leer únicamente la primera fila de encabezados. Las filas y la base de datos todavía no se procesan." TextWrapping="Wrap" />
+                            <TextBlock Margin="0,4,0,14" Foreground="#FF666666" Text="Seleccione un Excel, valide la clave y prepare una carga aislada. La tabla oficial todavía no se modifica." TextWrapping="Wrap" />
                             <GroupBox Header="Archivo" Padding="10">
                                 <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <TextBlock VerticalAlignment="Center" Text="Archivo de Sergio" />
@@ -109,9 +109,10 @@
                                 </ListBox>
                             </GroupBox>
                             <GroupBox Header="Clave primaria" Padding="10" Margin="0,12,0,0">
-                                <ComboBox x:Name="SergioPrimaryKeyComboBox" IsEnabled="False" AutomationProperties.Name="Clave primaria de Sergio" />
+                                <ComboBox x:Name="SergioPrimaryKeyComboBox" IsEnabled="False" AutomationProperties.Name="Clave primaria de Sergio" SelectionChanged="SergioPrimaryKeyComboBox_OnSelectionChanged" />
                             </GroupBox>
-                            <TextBlock Margin="0,12,0,0" Foreground="#FF666666" Text="Estado: solo se leyeron encabezados. Todavía no se procesaron filas ni se creó o modificó una base de datos." TextWrapping="Wrap" />
+                            <Button x:Name="SergioValidateButton" Margin="0,12,0,0" Width="240" HorizontalAlignment="Left" Content="Validar y preparar carga" IsEnabled="False" Click="SergioValidateButton_OnClick" />
+                            <TextBlock x:Name="SergioSummaryTextBlock" Margin="0,12,0,0" Foreground="#FF666666" Text="Estado: falta aceptar archivo, encabezados y clave primaria." TextWrapping="Wrap" />
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>

@@ -70,7 +70,10 @@ public sealed class ExcelDataReaderWorkbookRowCursor : IWorkbookRowCursor
     {
         var headers = new string?[reader.FieldCount];
         for (var index = 0; index < headers.Length; index++)
-            headers[index] = Convert.ToString(reader.GetValue(index), CultureInfo.InvariantCulture);
+        {
+            var value = reader.GetValue(index);
+            headers[index] = value is null ? null : Convert.ToString(value, CultureInfo.InvariantCulture);
+        }
 
         return headers;
     }

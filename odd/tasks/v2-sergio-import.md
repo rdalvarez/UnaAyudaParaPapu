@@ -48,6 +48,22 @@ Sergio workbooks can contain empty or repeated headers. Persisting those headers
   - RDD: disabled/unmanaged.
   - Commit: `31bc336` (`feat(v2): prioritize sergio primary keys`).
 
+- [x] **SER-003 — Stream Sergio into VARCHAR staging and validate the selected key**
+  - Route: delegated direct because DuckDB infrastructure, streaming workbook conversion, UI state, tests, and documentation span multiple non-trivial files.
+  - Scope: create/open the V2 DuckDB file under `%LOCALAPPDATA%\PapaPersonas\V2`; stream the accepted Sergio workbook once into a staging table whose aliased columns are all `VARCHAR`; preserve source values with deterministic text conversion; validate the selected key using `TRIM()` for empty and duplicate values; retain a valid staging candidate for a later confirmation/promote task; remove the candidate on validation or load failure. Do not replace the official table yet.
+  - Conversion: strings remain unchanged; null stays null; integral numbers have no decimal suffix; non-integral numbers use invariant round-trip text; dates/times use invariant ISO text; booleans use lowercase invariant text.
+  - Acceptance: analysis requires an accepted workbook and selected PK; global progress/logs use Paso 2; one workbook row pass; all aliases become quoted DuckDB `VARCHAR` columns; exact header snapshot is revalidated before rows; result reports total rows, empty-key rows, duplicate-key groups/rows, and validity without exposing values; invalid keys leave no candidate table; a valid candidate remains isolated and the existing official table is untouched.
+  - Checks: focused conversion/SQL tests, real XLSX-to-DuckDB integration tests, Release build, complete V2 tests, structural readback, and bounded smoke.
+  - Rollback: remove only V2 DuckDB staging/validation infrastructure, Sergio analyze UI/result state, focused tests, package reference, and this task evidence.
+  - Evidence: `SergioStagingAnalyzer` validates the existing workbook path, accepted raw-header snapshot, globally unique aliases, and exactly one selected key before database work. It opens ExcelDataReader once in single-pass mode with a non-writing share mode, revalidates raw headers including null identity/count/order before creating an opaque GUID-owned `sergio_staging_<N>` candidate, creates quoted `VARCHAR` aliases only, streams rows through DuckDB appender with missing-cell NULL padding, and removes candidates on width, validation, cancellation, or other failure. `SergioCellTextFormatter` preserves strings and applies invariant numeric, ISO date/time, duration, and lowercase boolean conversion. Empty/duplicate metrics use `TRIM()` only; invalid candidates are dropped, valid candidates remain owned and explicitly cleanable, and unrelated tables are not targeted. WPF adds the disabled-until-ready `Validar y preparar carga` action, global busy progress, Paso 2 count-only logs, summary, invalid warning, key/file invalidation, and best-effort closing cleanup. Tests cover formatter behavior, valid all-VARCHAR staging, duplicate trimmed keys, retained-candidate cleanup, unrelated-table survival, and explicit non-production temp DuckDB paths. No official Sergio table or metadata mutation exists. Verification: `dotnet restore V2/PapaPersonas.sln`; `dotnet build V2/PapaPersonas.sln -c Release --no-restore`; `dotnet test V2/PapaPersonas.sln -c Release --no-build` (63 passed); `git diff --check`. Bounded application launch/close smoke: not run; visual acceptance is not claimed. Structural readback: one workbook cursor pass, quoted aliases/all VARCHAR, exact header revalidation, opaque owned cleanup, no official/metadata table, and no data values in logs.
+  - RDD: disabled/unmanaged.
+  - Commit: `feat(v2): validate sergio staging load` (placeholder until commit).
+
+- [ ] **SER-004 — Preview and atomically promote the valid Sergio candidate**
+  - Status: future work after SER-003 verification and product review.
+  - Scope: show bounded preview and replacement warning, then atomically replace the single official Sergio table and update last-file/load-time metadata. Preserve the previous official execution on any failure.
+  - Evidence: pending.
+
 ## Progress
 
-SER-001 and SER-002 are complete. Later tasks will validate the chosen primary key across rows, stage all text columns in DuckDB, preview the load, and atomically replace the prior execution only after separate product confirmation.
+SER-001 and SER-002 are complete. SER-003 is the next authorized work unit. SER-004 will preview and atomically replace the prior official execution only after separate confirmation.

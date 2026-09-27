@@ -26,6 +26,8 @@ public partial class MainWindow : Window
     private string? _acceptedSergioFilePath;
     private SergioHeaderPreflightResult? _acceptedSergioHeaders;
     private bool _isBusy;
+    private readonly SergioStagingAnalyzer _sergioAnalyzer = new();
+    private string? _sergioCandidateTable;
 
     public MainWindow()
     {
@@ -33,6 +35,11 @@ public partial class MainWindow : Window
         ApplyTabCatalog();
         RejectedFolderTextBox.Cursor = System.Windows.Input.Cursors.Hand;
         RejectedFolderTextBox.MouseLeftButtonUp += (_, _) => OpenRejectedFolder();
+        Closing += (_, _) =>
+        {
+            try { _sergioAnalyzer.CleanupAll(); }
+            catch (Exception exception) { AddActivity("Paso 2", $"Advertencia: no se pudo limpiar candidato Sergio al cerrar: {exception.Message}"); }
+        };
     }
 
     private void ApplyTabCatalog()
@@ -112,6 +119,7 @@ public partial class MainWindow : Window
 
     private async void SergioBrowseFileButton_OnClick(object sender, RoutedEventArgs e)
     {
+        CleanupSergioCandidate();
         var dialog = new WpfOpenFileDialog { Filter = "Archivos de Excel (*.xlsx;*.xls)|*.xlsx;*.xls", CheckFileExists = true, Multiselect = false };
         if (dialog.ShowDialog(this) != true) return;
 
@@ -159,10 +167,13 @@ public partial class MainWindow : Window
         SergioPrimaryKeyComboBox.ItemsSource = SergioPrimaryKeySelection.Options(result.Columns);
         SergioPrimaryKeyComboBox.SelectedItem = SergioPrimaryKeySelection.DefaultAlias(result.Columns);
         SergioPrimaryKeyComboBox.IsEnabled = true;
+        SergioSummaryTextBlock.Text = "Estado: encabezados aceptados; seleccione la clave primaria y valide.";
+        UpdateSergioControls();
     }
 
     private void ClearAcceptedSergioState()
     {
+        CleanupSergioCandidate();
         _acceptedSergioFilePath = null;
         _acceptedSergioHeaders = null;
         SergioFileTextBox.Clear();
@@ -170,6 +181,8 @@ public partial class MainWindow : Window
         SergioPrimaryKeyComboBox.ItemsSource = null;
         SergioPrimaryKeyComboBox.SelectedItem = null;
         SergioPrimaryKeyComboBox.IsEnabled = false;
+        SergioSummaryTextBlock.Text = "Estado: falta aceptar archivo, encabezados y clave primaria.";
+        UpdateSergioControls();
     }
 
     private static string DisplayHeader(string? value) => string.IsNullOrEmpty(value) ? "<vacío>" : value.Replace("\r", "\\r").Replace("\n", "\\n");
@@ -227,6 +240,7 @@ public partial class MainWindow : Window
         BrowseFileButton.IsEnabled = !isBusy;
         SergioBrowseFileButton.IsEnabled = !isBusy;
         SergioPrimaryKeyComboBox.IsEnabled = !isBusy && _acceptedSergioHeaders is not null;
+        SergioValidateButton.IsEnabled = !isBusy && _acceptedSergioHeaders is not null && SergioPrimaryKeyComboBox.SelectedItem is string;
         BrowseFolderButton.IsEnabled = !isBusy;
         RejectedFolderLabel.IsEnabled = !isBusy;
         RejectedFolderTextBox.IsEnabled = !isBusy;
@@ -236,6 +250,46 @@ public partial class MainWindow : Window
 
     private void CleaningColumnComboBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e) =>
         UpdateCleaningControls();
+
+    private void SergioPrimaryKeyComboBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        CleanupSergioCandidate();
+        SergioSummaryTextBlock.Text = "Estado: clave modificada; vuelva a validar la carga.";
+        UpdateSergioControls();
+    }
+
+    private async void SergioValidateButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (_isBusy || _acceptedSergioHeaders is null || _acceptedSergioFilePath is null || SergioPrimaryKeyComboBox.SelectedItem is not string selectedKey) return;
+        var request = new SergioStagingRequest(_acceptedSergioFilePath, _acceptedSergioHeaders, selectedKey);
+        CleanupSergioCandidate();
+        SetBusy(true, "Validando y preparando carga de Sergio...");
+        try
+        {
+            var result = await Task.Run(() => _sergioAnalyzer.Analyze(request));
+            _sergioCandidateTable = result.IsValid ? result.CandidateTableName : null;
+            SergioSummaryTextBlock.Text = $"Filas: {result.TotalRows}. Clave vacía: {result.EmptyPrimaryKeyRows}. Grupos duplicados: {result.DuplicateGroups}. Filas duplicadas: {result.DuplicateRows}. Estado: {(result.IsValid ? "válido; listo para una confirmación futura" : "inválido; no se retuvo candidato")}.";
+            AddActivity("Paso 2", $"Validación Sergio: filas {result.TotalRows}, vacías {result.EmptyPrimaryKeyRows}, grupos duplicados {result.DuplicateGroups}, filas duplicadas {result.DuplicateRows}, candidato {(result.IsValid ? result.CandidateTableName : "ninguno")}.");
+            if (!result.IsValid) System.Windows.MessageBox.Show(this, "La clave primaria contiene valores vacíos o duplicados. No se retuvo ninguna tabla candidata.", "Carga de Sergio inválida", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        catch (Exception exception)
+        {
+            AddActivity("Paso 2", $"Error al validar Sergio: {exception.Message}");
+            SergioSummaryTextBlock.Text = "Estado: no se pudo preparar la carga; no se retuvo candidato.";
+            System.Windows.MessageBox.Show(this, $"No se pudo validar y preparar la carga de Sergio.\n\n{exception.Message}", "No se pudo validar Sergio", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally { SetBusy(false); }
+    }
+
+    private void CleanupSergioCandidate()
+    {
+        if (_sergioCandidateTable is null) return;
+        try { _sergioAnalyzer.Cleanup(_sergioCandidateTable); }
+        catch (Exception exception) { AddActivity("Paso 2", $"Advertencia: no se pudo limpiar candidato Sergio: {exception.Message}"); }
+        finally { _sergioCandidateTable = null; }
+    }
+
+    private void UpdateSergioControls() => SergioValidateButton.IsEnabled = !_isBusy && File.Exists(_acceptedSergioFilePath) && _acceptedSergioHeaders?.Columns.Count > 0 && SergioPrimaryKeyComboBox.SelectedItem is string;
 
     private void RemoveDuplicatesButton_OnClick(object sender, RoutedEventArgs e) =>
         AddCleaningStep(CleaningAction.RemoveDuplicates, DuplicateColumnComboBox.SelectedItem as DetectedColumn);
