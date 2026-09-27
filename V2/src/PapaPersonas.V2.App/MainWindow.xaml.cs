@@ -23,6 +23,8 @@ public partial class MainWindow : Window
     private string? _rejectedFolderPath;
     private IReadOnlyList<string?> _rawHeaders = [];
     private IReadOnlyList<OutputColumnSelection> _outputColumns = [];
+    private string? _acceptedSergioFilePath;
+    private SergioHeaderPreflightResult? _acceptedSergioHeaders;
     private bool _isBusy;
 
     public MainWindow()
@@ -108,6 +110,70 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void SergioBrowseFileButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new WpfOpenFileDialog { Filter = "Archivos de Excel (*.xlsx;*.xls)|*.xlsx;*.xls", CheckFileExists = true, Multiselect = false };
+        if (dialog.ShowDialog(this) != true) return;
+
+        var path = dialog.FileName;
+        try
+        {
+            SetBusy(true, "Leyendo encabezados de Sergio...");
+            var rawHeaders = await Task.Run(() => _headerReader.ReadHeaders(path).ToArray());
+            var result = SergioHeaderPreflight.Analyze(rawHeaders);
+            if (result.HasIssues)
+            {
+                var issueDialog = new SergioHeaderIssueDialog(result) { Owner = this };
+                if (issueDialog.ShowDialog() != true || !issueDialog.Accepted)
+                {
+                    ClearAcceptedSergioState();
+                    AddActivity("Paso 2", "Lectura de Sergio cancelada por el usuario.");
+                    return;
+                }
+            }
+
+            AcceptSergioState(path, result);
+            AddActivity("Paso 2", $"Archivo de Sergio seleccionado: {path}");
+            AddActivity("Paso 2", $"Encabezados de Sergio detectados: {result.Columns.Count}.");
+            if (SergioPrimaryKeyComboBox.SelectedItem is null)
+                AddActivity("Paso 2", "Advertencia: no se encontró el encabezado exacto CUIL; la clave primaria quedó sin seleccionar.");
+        }
+        catch (Exception exception)
+        {
+            ClearAcceptedSergioState();
+            AddActivity("Paso 2", $"Error al leer encabezados de Sergio: {exception.Message}");
+            System.Windows.MessageBox.Show(this, $"No se pudieron leer los encabezados del archivo de Sergio.\n\n{exception.Message}", "No se pudo cargar el archivo", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
+    private void AcceptSergioState(string path, SergioHeaderPreflightResult result)
+    {
+        _acceptedSergioFilePath = path;
+        _acceptedSergioHeaders = result;
+        SergioFileTextBox.Text = path;
+        SergioHeadersListBox.ItemsSource = result.Columns.Select(column => $"{column.Position + 1}. {DisplayHeader(column.RawName)} → {column.ProposedAlias}").ToArray();
+        SergioPrimaryKeyComboBox.ItemsSource = result.Columns.Select(column => column.ProposedAlias).ToArray();
+        SergioPrimaryKeyComboBox.SelectedItem = SergioPrimaryKeySelection.DefaultAlias(result.Columns);
+        SergioPrimaryKeyComboBox.IsEnabled = true;
+    }
+
+    private void ClearAcceptedSergioState()
+    {
+        _acceptedSergioFilePath = null;
+        _acceptedSergioHeaders = null;
+        SergioFileTextBox.Clear();
+        SergioHeadersListBox.ItemsSource = null;
+        SergioPrimaryKeyComboBox.ItemsSource = null;
+        SergioPrimaryKeyComboBox.SelectedItem = null;
+        SergioPrimaryKeyComboBox.IsEnabled = false;
+    }
+
+    private static string DisplayHeader(string? value) => string.IsNullOrEmpty(value) ? "<vacío>" : value.Replace("\r", "\\r").Replace("\n", "\\n");
+
     private void BrowseFolderButton_OnClick(object sender, RoutedEventArgs e)
     {
         using var dialog = new System.Windows.Forms.FolderBrowserDialog
@@ -159,6 +225,8 @@ public partial class MainWindow : Window
         OperationProgressBar.Value = 0;
         OperationStatusTextBlock.Text = isBusy ? status ?? "Procesando..." : "Sin operaciones en curso.";
         BrowseFileButton.IsEnabled = !isBusy;
+        SergioBrowseFileButton.IsEnabled = !isBusy;
+        SergioPrimaryKeyComboBox.IsEnabled = !isBusy && _acceptedSergioHeaders is not null;
         BrowseFolderButton.IsEnabled = !isBusy;
         RejectedFolderLabel.IsEnabled = !isBusy;
         RejectedFolderTextBox.IsEnabled = !isBusy;
@@ -288,9 +356,11 @@ public partial class MainWindow : Window
         }
     }
 
-    private void AddActivity(string message)
+    private void AddActivity(string message) => AddActivity("Paso 1", message);
+
+    private void AddActivity(string section, string message)
     {
-        _activityLog.Add("Paso 1", message);
+        _activityLog.Add(section, message);
         ActivityTextBox.Text = string.Join(Environment.NewLine, _activityLog.Entries);
     }
 

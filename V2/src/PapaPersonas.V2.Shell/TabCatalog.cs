@@ -7,7 +7,7 @@ public static class TabCatalog
     public static IReadOnlyList<TabDefinition> All { get; } =
     [
         new("Preparar archivo de Hernán", true),
-        new("Ingresar archivo de Sergio", false),
+        new("Ingresar archivo de Sergio", true),
         new("Generación y consulta de stock", false),
         new("Consultas (opcional)", false)
     ];

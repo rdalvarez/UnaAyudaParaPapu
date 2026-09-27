@@ -90,7 +90,32 @@
                     </ScrollViewer>
                 </Grid>
             </TabItem>
-            <TabItem x:Name="SergioTab"><TextBlock Margin="12" Text="Disponible en una fase futura." /></TabItem>
+            <TabItem x:Name="SergioTab">
+                <Grid Margin="6">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="0,0,6,0">
+                            <TextBlock FontSize="18" FontWeight="SemiBold" Text="Ingresar archivo de Sergio" />
+                            <TextBlock Margin="0,4,0,14" Foreground="#FF666666" Text="Seleccione un Excel para leer únicamente la primera fila de encabezados. Las filas y la base de datos todavía no se procesan." TextWrapping="Wrap" />
+                            <GroupBox Header="Archivo" Padding="10">
+                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock VerticalAlignment="Center" Text="Archivo de Sergio" />
+                                    <TextBox x:Name="SergioFileTextBox" Grid.Column="1" Margin="8,4" IsReadOnly="True" />
+                                    <Button x:Name="SergioBrowseFileButton" Grid.Column="2" Margin="8,4" Content="Buscar archivo" Click="SergioBrowseFileButton_OnClick" />
+                                </Grid>
+                            </GroupBox>
+                            <GroupBox Header="Encabezados detectados y alias" Padding="10" Margin="0,12,0,0">
+                                <ListBox x:Name="SergioHeadersListBox" Height="180" AutomationProperties.Name="Encabezados de Sergio">
+                                    <ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" Margin="0,2" /></DataTemplate></ListBox.ItemTemplate>
+                                </ListBox>
+                            </GroupBox>
+                            <GroupBox Header="Clave primaria" Padding="10" Margin="0,12,0,0">
+                                <ComboBox x:Name="SergioPrimaryKeyComboBox" IsEnabled="False" AutomationProperties.Name="Clave primaria de Sergio" />
+                            </GroupBox>
+                            <TextBlock Margin="0,12,0,0" Foreground="#FF666666" Text="Estado: solo se leyeron encabezados. Todavía no se procesaron filas ni se creó o modificó una base de datos." TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
             <TabItem x:Name="StockTab"><TextBlock Margin="12" Text="Disponible en una fase futura." /></TabItem>
             <TabItem x:Name="ConsultasTab"><TextBlock Margin="12" Text="Disponible en una fase futura." /></TabItem>
         </TabControl>
@@ -101,7 +126,7 @@
         </GroupBox>
 
         <Border Grid.Row="6" Padding="8" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFF9F9F9">
-            <TextBlock Text="La limpieza de la Solapa 1 está conectada. TXT, CSV/TXT de entrada, Sergio, Stock, Consultas y persistencia permanecen fuera de alcance." TextWrapping="Wrap" />
+            <TextBlock Text="La limpieza de la Solapa 1 y el preflight de encabezados de Sergio están conectados. Sergio todavía no procesa filas ni usa DuckDB; TXT, Stock y Consultas permanecen fuera de alcance." TextWrapping="Wrap" />
         </Border>
     </Grid>
 </Window>

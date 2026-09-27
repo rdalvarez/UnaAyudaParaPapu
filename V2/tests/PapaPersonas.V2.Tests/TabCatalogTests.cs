@@ -15,7 +15,7 @@ public sealed class TabCatalogTests
     }
 
     [Fact]
-    public void DefinesTheAuthorizedTabsInOrderWithOnlyPasoOneEnabled()
+    public void DefinesTheAuthorizedTabsInOrderWithPasoOneAndSergioEnabled()
     {
         Assert.Equal(
             [
@@ -25,7 +25,7 @@ public sealed class TabCatalogTests
                 "Consultas (opcional)"
             ],
             TabCatalog.All.Select(tab => tab.Title));
-        Assert.Equal([true, false, false, false], TabCatalog.All.Select(tab => tab.IsEnabled));
+        Assert.Equal([true, true, false, false], TabCatalog.All.Select(tab => tab.IsEnabled));
     }
 
     [Fact]
