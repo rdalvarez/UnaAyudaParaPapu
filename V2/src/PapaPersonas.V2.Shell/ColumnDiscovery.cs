@@ -85,6 +85,18 @@ public interface IHeaderReader
     IReadOnlyList<string?> ReadHeaders(string filePath);
 }
 
+public static class HeaderReaderConfiguration
+{
+    public static ExcelReaderConfiguration Create()
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        return new ExcelReaderConfiguration
+        {
+            SinglePassMode = true
+        };
+    }
+}
+
 public sealed class ExcelDataReaderHeaderReader : IHeaderReader
 {
     private static bool _encodingProviderRegistered;
@@ -93,7 +105,7 @@ public sealed class ExcelDataReaderHeaderReader : IHeaderReader
     {
         EnsureEncodingProviderRegistered();
         using var stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        using var reader = ExcelReaderFactory.CreateReader(stream);
+        using var reader = ExcelReaderFactory.CreateReader(stream, HeaderReaderConfiguration.Create());
         if (!reader.Read())
         {
             return [];

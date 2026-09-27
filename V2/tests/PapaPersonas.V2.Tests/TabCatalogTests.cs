@@ -1,3 +1,4 @@
+using ExcelDataReader;
 using PapaPersonas.V2.Shell;
 using Xunit;
 
@@ -5,6 +6,14 @@ namespace PapaPersonas.V2.Tests;
 
 public sealed class TabCatalogTests
 {
+    [Fact]
+    public void HeaderReaderUsesSinglePassConfiguration()
+    {
+        var configuration = HeaderReaderConfiguration.Create();
+
+        Assert.True(configuration.SinglePassMode);
+    }
+
     [Fact]
     public void DefinesTheAuthorizedTabsInOrderWithOnlyPasoOneEnabled()
     {

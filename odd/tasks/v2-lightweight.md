@@ -155,6 +155,24 @@ The current application contains a cumulative master-database workflow that is n
     - Independent verification: PASS; confirmed plan-only scope, correct state transitions, 0 build warnings/errors, and 7 passing tests.
     - Next step: visual/manual review of the ordered plan; do not execute cleaning yet.
 
+- [x] **V2L-008 — Read workbook headers in single-pass mode**
+  - Route: delegated direct because the change requires reader configuration, a regression seam, performance evidence, and documentation.
+  - Scope: configure ExcelDataReader 3.9.0 with `SinglePassMode = true` for header discovery so it skips the initial full worksheet scan. Do not change displayed headers, planning behavior, or row processing.
+  - Acceptance: header discovery still returns the same first-row values and positional identities while no longer requesting the initial full scan; build, tests, and a before/after measurement with the same real workbook are reported honestly.
+  - Checks: focused reader/configuration tests, Release build, complete V2 tests, runtime harness, and user-observed timing when private input cannot be used automatically.
+  - Rollback boundary: ExcelDataReader header-reader configuration and related evidence only.
+   - Evidence:
+     - `dotnet build V2/PapaPersonas.sln -c Release --no-restore`: passed; 0 warnings, 0 errors.
+     - `dotnet test V2/PapaPersonas.sln -c Release --no-build`: passed; 8 passed, 0 failed, 0 skipped.
+     - Readback: `ExcelDataReaderHeaderReader` passes `HeaderReaderConfiguration.Create()` to `CreateReader`; that configuration sets `SinglePassMode = true`. Header discovery calls `Read()` once, uses the resulting `FieldCount`, preserves raw value order and positional normalization, and does not use `RowCount`.
+     - Configuration seam test: passed; the productive configuration factory returns `SinglePassMode = true` without reflection or reader abstraction.
+     - Runtime harness V2: passed; Release executable started, exposed its main window, closed cleanly through `CloseMainWindow()`, and exited with code 0 without forced termination.
+     - Workbook comparison: pending manual observation by the user with the same private workbook; no performance improvement was measured or claimed here.
+     - Rollback boundary: revert the single-pass header-reader configuration, its focused seam test, and V2L-008 documentation only; header presentation, plan behavior, UI, and future cleaning semantics remain unchanged.
+     - RDD risk: `disabled/unmanaged`.
+     - Commit: the single work-unit commit is `perf(v2): read workbook headers in single pass`.
+     - Next step: the user compares speed manually with the same workbook; before future cleaning execution, headers will be re-read and compared, but that behavior is not implemented now.
+
 ## Confirmed Future Cleaning Semantics
 
 - Each cleaning cycle operates on one selected column and on the previous cycle's result.
@@ -162,7 +180,8 @@ The current application contains a cumulative master-database workflow that is n
 - Empty cleaning trims the selected-column value and rejects the full row when the result is empty.
 - Rejected output preserves the complete source row, rejected value, reason, and cycle evidence.
 - Every cycle emits operator-visible activity logs.
+- Immediately before future cleaning execution, re-read the original header row and compare column count, order, and raw identity with the planning snapshot. Abort without processing and require a reload if the workbook changed.
 
 ## Progress and Next Step
 
-`V2L-001` through `V2L-007` are complete and manually accepted through functional verification. V2L-007 builds and clears an ordered cleaning plan without processing rows. The next step is visual/manual review of the plan; TXT log export and cleaning execution remain future tasks.
+`V2L-001` through `V2L-007` are complete. The next authorized work unit is V2L-008 single-pass header discovery. The ordered plan still awaits manual review; TXT log export and cleaning execution remain future tasks.
