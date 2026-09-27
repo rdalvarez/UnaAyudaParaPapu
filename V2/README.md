@@ -1,6 +1,6 @@
 # PapaPersonas V2
 
-V2 currently contains an independent WPF shell and the first bounded behavior for **Preparar archivo de Hernán**: selecting an Excel workbook reads only its headers in ExcelDataReader single-pass mode, creates the default `rech` folder, exposes independently selectable dynamic columns, and shows visible indeterminate feedback while headers are being read. Workbook staging now streams the first worksheet into `current.csv` in the canonical temporary workspace. V2L-013 applies ordered cleaning cycles as a pure workspace processor, replacing `current.csv` between cycles and consolidating `rejected.csv`; it remains disconnected from the UI and publication. Cleaning selections still build an ordered visible plan only. Export, Sergio, DuckDB, and persistence remain disabled.
+V2 currently contains an independent WPF shell and the first bounded behavior for **Preparar archivo de Hernán**: selecting an Excel workbook reads only its headers in ExcelDataReader single-pass mode, creates the default `rech` folder, exposes independently selectable dynamic columns, and shows visible indeterminate feedback while headers are being read. Workbook staging now streams the first worksheet into `current.csv` in the canonical temporary workspace. V2L-013 applies ordered cleaning cycles as a pure workspace processor, replacing `current.csv` between cycles and consolidating `rejected.csv`. V2L-014 now provides the disconnected end-to-end coordinator and safe paired CSV publication; UI wiring is intentionally deferred to V2L-015. Cleaning selections still build an ordered visible plan only. Export, Sergio, DuckDB, and persistence remain disabled.
 
 ## Verification
 
@@ -22,4 +22,4 @@ V2L-011 adds reusable fixed-workspace and streaming CSV infrastructure. The prod
 
 ## Next step
 
-The next step is V2L-014: orchestrate workspace preparation, disconnected staging/cycles, and safe publication. V2L-013 is implemented but remains disconnected from UI and publication.
+The next step is V2L-015: wire execution progress and completion UI. V2L-014's end-to-end engine remains disconnected from the UI.

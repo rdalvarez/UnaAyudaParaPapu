@@ -244,10 +244,18 @@ The current application contains a cumulative master-database workflow that is n
     - RDD risk: `disabled/unmanaged`.
     - Commit: this work-unit commit (`feat(v2): process streaming cleaning cycles`).
 
-- [ ] **V2L-014 — Orchestrate cleanup and publish outputs safely**
-  - Status: future implementation task after V2L-013 verification.
+- [x] **V2L-014 — Orchestrate cleanup and publish outputs safely**
+  - Status: complete; the end-to-end engine remains disconnected from UI.
   - Scope: coordinate fixed-workspace prepare/cleanup in `finally`, preflight/staging/cleaning, and safe publication. Clean CSV goes beside the original; one consolidated rejected CSV goes inside the selected `rech` folder. Both names use the source base name plus timestamp.
-  - Evidence: pending.
+  - Evidence:
+    - `dotnet build V2/PapaPersonas.sln -c Release --no-restore`: passed; 0 warnings and 0 errors.
+    - `dotnet test V2/PapaPersonas.sln -c Release --no-build`: passed; 35 passed, 0 failures, and 0 skips.
+    - Structural readback: the coordinator rejects an empty visible plan before workspace preparation, executes prepare/stage/process/publish in order, and always attempts cleanup in `finally`. Safe publication uses destination-local `.partial` files, one shared timestamp, deterministic shared collision suffixes, exact byte copies, and attempt-only rollback. No UI, V1, TXT export, CSV/TXT input, DuckDB, or remote code was added.
+    - Tests cover real ClosedXML `.xlsx` end-to-end processing, custom rejected folder, collision suffix without overwrite, header mismatch and malformed processing cleanup, publication failure cleanup boundaries, and empty-plan short-circuit. All test workspace roots are explicit temporary paths; production LocalAppData is not used.
+    - Runtime harness: `N/A` — the coordinator is intentionally disconnected from UI; end-to-end and focused tests are the applicable functional boundary.
+    - Rollback boundary: revert the V2L-014 coordinator, publisher, tests, README, and this evidence; V2L-013 processing and earlier V2 infrastructure remain outside the boundary.
+    - RDD risk: `disabled/unmanaged`.
+    - Commit: `feat(v2): orchestrate cleaning output publication` (this work-unit commit).
 
 - [ ] **V2L-015 — Wire execution progress and completion UI**
   - Status: future implementation task after V2L-014 verification.
