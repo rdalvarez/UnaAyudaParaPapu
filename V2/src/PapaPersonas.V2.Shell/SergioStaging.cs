@@ -79,7 +79,7 @@ public sealed class SergioStagingAnalyzer
 {
     private readonly DuckDbPathPolicy pathPolicy;
     private readonly IWorkbookRowCursorFactory cursorFactory;
-    private readonly Dictionary<string, string> ownedCandidates = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, CandidateDescriptor> ownedCandidates = new(StringComparer.Ordinal);
     private readonly object sync = new();
 
     public SergioStagingAnalyzer(DuckDbPathPolicy? pathPolicy = null, IWorkbookRowCursorFactory? cursorFactory = null)
@@ -111,7 +111,8 @@ public sealed class SergioStagingAnalyzer
             var schemaAliases = acceptedAliases.Contains(reasonColumn, StringComparer.Ordinal) ? acceptedAliases : [.. acceptedAliases, reasonColumn];
             var aliases = acceptedAliases.Where(alias => !string.Equals(alias, reasonColumn, StringComparison.Ordinal)).ToArray();
             candidate = CreateCandidateName();
-            lock (sync) ownedCandidates.Add(candidate, request.SelectedPrimaryKeyAlias);
+            lock (sync) ownedCandidates.Add(candidate, new CandidateDescriptor(
+                Path.GetFullPath(request.WorkbookPath), acceptedAliases, request.SelectedPrimaryKeyAlias, reasonColumn));
             using var connection = Open(databasePath);
             using var transaction = connection.BeginTransaction();
             Execute(connection, transaction, $"CREATE TABLE {Quote(candidate)} ({string.Join(", ", schemaAliases.Select(alias => $"{Quote(alias)} VARCHAR"))})");
@@ -205,8 +206,19 @@ public sealed class SergioStagingAnalyzer
     internal bool OwnsCandidate(string candidateTableName, string selectedPrimaryKeyAlias)
     {
         lock (sync)
-            return ownedCandidates.TryGetValue(candidateTableName, out var ownedKey) &&
-                string.Equals(ownedKey, selectedPrimaryKeyAlias, StringComparison.Ordinal);
+            return ownedCandidates.TryGetValue(candidateTableName, out var descriptor) &&
+                string.Equals(descriptor.SelectedPrimaryKeyAlias, selectedPrimaryKeyAlias, StringComparison.Ordinal);
+    }
+
+    internal CandidateDescriptor GetOwnedCandidate(string candidateTableName, string workbookPath)
+    {
+        lock (sync)
+        {
+            if (!ownedCandidates.TryGetValue(candidateTableName, out var descriptor) ||
+                !string.Equals(descriptor.WorkbookPath, Path.GetFullPath(workbookPath), StringComparison.Ordinal))
+                throw new InvalidOperationException("The Sergio candidate is unknown, not owned by this analyzer, or belongs to a different workbook.");
+            return descriptor;
+        }
     }
 
     internal void ReleaseCandidate(string candidateTableName)
@@ -214,6 +226,7 @@ public sealed class SergioStagingAnalyzer
         lock (sync) ownedCandidates.Remove(candidateTableName);
     }
     internal string DatabasePath => pathPolicy.GetDatabasePath();
+    internal sealed record CandidateDescriptor(string WorkbookPath, IReadOnlyList<string> AcceptedAliases, string SelectedPrimaryKeyAlias, string ReasonColumn);
     private sealed class PromotionLock : IDisposable
     {
         private readonly object gate;

@@ -16,6 +16,9 @@ public sealed class StreamingCsvWriter : IDisposable
     public static StreamingCsvWriter Open(string path) =>
         new(File.Open(path, FileMode.Create, FileAccess.Write, FileShare.None));
 
+    public static StreamingCsvWriter OpenNew(string path) =>
+        new(File.Open(path, FileMode.CreateNew, FileAccess.Write, FileShare.None));
+
     public void WriteRow(IEnumerable<string?> fields)
     {
         ArgumentNullException.ThrowIfNull(fields);
