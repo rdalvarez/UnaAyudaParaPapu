@@ -142,16 +142,18 @@ The current application contains a cumulative master-database workflow that is n
   - Checks: focused plan-state tests, Release build, structural readback, and runtime harness.
   - Rollback boundary: V2 cleaning-plan UI/state/log behavior only.
   - Evidence:
-     - `dotnet build V2/PapaPersonas.sln -c Release --no-restore`: passed; 0 warnings, 0 errors.
-     - `dotnet test V2/PapaPersonas.sln -c Release --no-build`: passed; 7 passed, 0 failed, 0 skipped.
-     - Plan-state tests passed for insertion order, action type, positional column identity, visible numbering, clear count, empty state, and repeated actions.
-     - XAML/code readback: passed; both action buttons require a valid combo selection and are disabled while busy; the visible `Plan de limpieza` list, synchronized summary, and single `Limpiar plan` action are present; clear-all has no confirmation or individual removal; `Generar archivo de salida` remains disabled and has no handler; no row processing was added.
-     - Workbook replacement readback: passed; a successful new header read resets the previous plan before presenting new columns and logs the reset only when steps existed; selector cancellation or a failed read returns before mutation, preserving the prior file, columns, and plan.
-     - Runtime harness V2: passed; Release executable started, exposed the main window, closed through `CloseMainWindow()`, exited cleanly with code 0, and did not require forced termination.
-     - Rollback boundary: remove the cleaning-plan model, UI, handlers, tests, README note, and this V2L-007 evidence; V2L-004/V2L-006 header discovery and progress behavior remain outside the boundary.
-     - RDD risk: `disabled/unmanaged`.
-     - Commit: this required single work-unit commit, `feat(v2): build ordered cleaning plan`.
-     - Next step: visual/manual review of the ordered plan; do not execute cleaning yet.
+    - `dotnet build V2/PapaPersonas.sln -c Release --no-restore`: passed; 0 warnings, 0 errors.
+    - `dotnet test V2/PapaPersonas.sln -c Release --no-build`: passed; 7 passed, 0 failed, 0 skipped.
+    - Plan-state tests passed for insertion order, action type, positional column identity, visible numbering, clear count, empty state, and repeated actions.
+    - XAML/code readback: passed; both action buttons require a valid combo selection and are disabled while busy; the visible `Plan de limpieza` list, synchronized summary, and single `Limpiar plan` action are present; clear-all has no confirmation or individual removal; `Generar archivo de salida` remains disabled and has no handler; no row processing was added.
+    - Workbook replacement readback: passed; a successful new header read resets the previous plan before presenting new columns and logs the reset only when steps existed; selector cancellation or a failed read returns before mutation, preserving the prior file, columns, and plan.
+    - Runtime harness V2: passed; Release executable started, exposed the main window, closed through `CloseMainWindow()`, exited cleanly with code 0, and did not require forced termination.
+    - Rollback boundary: remove the cleaning-plan model, UI, handlers, tests, README note, and this V2L-007 evidence; V2L-004/V2L-006 header discovery and progress behavior remain outside the boundary.
+    - RDD risk: `disabled/unmanaged`; automated assessment was high only because `MainWindow` still contains the unchanged folder-opening process boundary.
+    - Commit: `b08fa5d` (`feat(v2): build ordered cleaning plan`).
+    - Parent spot check: `dotnet test V2/PapaPersonas.sln -c Release --no-build` passed again with 7 passed, 0 failed, and 0 skipped.
+    - Independent verification: PASS; confirmed plan-only scope, correct state transitions, 0 build warnings/errors, and 7 passing tests.
+    - Next step: visual/manual review of the ordered plan; do not execute cleaning yet.
 
 ## Confirmed Future Cleaning Semantics
 
