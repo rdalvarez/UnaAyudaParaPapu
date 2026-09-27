@@ -212,15 +212,37 @@ The current application contains a cumulative master-database workflow that is n
     - RDD risk: `disabled/unmanaged`.
     - Commit: this work-unit commit (`feat(v2): add streaming temporary transport`).
 
-- [ ] **V2L-012 — Execute cleaning cycles and publish outputs**
-  - Status: future implementation task after V2L-011 verification.
-  - Scope: stream Excel rows into the fixed workspace, apply each normalized cycle in order, write target outputs safely, and always clean the workspace in `finally`. No DuckDB and no whole-file row materialization.
-  - Output: clean CSV beside the original; one consolidated rejected CSV inside the selected `rech` folder. Both names use the source base name plus timestamp. Rejected metadata columns appear first: `PP_MOTIVO`, `PP_PASO`, `PP_COLUMNA`, `PP_VALOR`, followed by every original column in order.
+- [x] **V2L-012 — Stream workbook rows into the canonical workspace CSV**
+  - Status: complete; staging exists as a disconnected execution primitive.
+  - Route: delegated direct because the workbook cursor, row normalization, and integration tests span multiple non-trivial files.
+  - Scope: open the first worksheet once with ExcelDataReader single-pass mode, expose its raw headers, run V2L-010 preflight before the first data row is written, then stream each row into `current.csv` at the planning header width. Preserve positional columns, format dates/numbers deterministically, and return row/preflight metadata without publishing outputs.
+  - Exclusions: no cleaning cycles, rejected CSV, final output publication, workspace orchestration, or UI wiring.
+  - Evidence:
+    - `dotnet restore V2/PapaPersonas.sln`: passed; ClosedXML 0.105.0 restored only in the V2 test project.
+    - `dotnet build V2/PapaPersonas.sln -c Release --no-restore`: passed; 0 warnings, 0 errors.
+    - `dotnet test V2/PapaPersonas.sln -c Release --no-build`: passed; 24 passed, 0 failed, 0 skipped.
+    - Focused workbook staging tests: passed; 24 passed, 0 failed, 0 skipped. Fake cursors cover row streaming, padding, header mismatch, invalid positions, extra columns with partial cleanup, and input immutability. A test-time `.xlsx` through ExcelDataReader covers first-sheet headers/rows, Unicode, deterministic dates, and invariant numbers.
+    - Structural readback: one ExcelDataReader workbook pass uses `HeaderReaderConfiguration.Create()` and `FileShare.Read`; preflight runs before `current.csv` creation; rows are streamed; partial output is removed on failure; no cleaning, publication, UI, or V1 changes were added.
+    - Runtime harness: `N/A` — staging is intentionally disconnected from UI; focused tests are the applicable functional boundary.
+    - Rollback boundary: remove `WorkbookRowCursor.cs`, `WorkbookStaging.cs`, their focused tests and test-only ClosedXML reference, plus this V2L-012/README evidence; V2L-010/V2L-011 and V1 remain outside the boundary.
+    - RDD risk: `disabled/unmanaged`.
+    - Commit placeholder/identity: this work-unit commit (`feat(v2): stage workbook rows for cleaning`).
+    - Route: rollback by reverting the single work-unit commit; no remote operation requested or performed.
+
+- [ ] **V2L-013 — Apply cleaning cycles and consolidate rejections**
+  - Status: future implementation task after V2L-012 verification.
+  - Scope: consume `current.csv`, apply each normalized cycle in order through next-file replacement, and build one rejected CSV. No DuckDB and no whole-file row materialization.
+  - Rejected output metadata columns appear first: `PP_MOTIVO`, `PP_PASO`, `PP_COLUMNA`, `PP_VALOR`, followed by every original column in order; source headers colliding with technical names receive deterministic suffixes.
   - Duplicate semantics: compare trimmed non-empty values case-insensitively; reject every row in repeated groups. Empty semantics: trim the selected value and reject when empty.
   - Evidence: pending.
 
-- [ ] **V2L-013 — Wire execution progress and completion UI**
-  - Status: future implementation task after V2L-012 verification.
+- [ ] **V2L-014 — Orchestrate cleanup and publish outputs safely**
+  - Status: future implementation task after V2L-013 verification.
+  - Scope: coordinate fixed-workspace prepare/cleanup in `finally`, preflight/staging/cleaning, and safe publication. Clean CSV goes beside the original; one consolidated rejected CSV goes inside the selected `rech` folder. Both names use the source base name plus timestamp.
+  - Evidence: pending.
+
+- [ ] **V2L-015 — Wire execution progress and completion UI**
+  - Status: future implementation task after V2L-014 verification.
   - Scope: enable generation only for a valid input, output folder, and non-empty plan; run asynchronously with the existing busy guard; render validation/cycle/output logs; and show a final custom dialog with `Abrir carpeta` (opens the source folder) and `Aceptar`.
   - Evidence: pending.
 
@@ -235,4 +257,4 @@ The current application contains a cumulative master-database workflow that is n
 
 ## Progress and Next Step
 
-`V2L-001` through `V2L-008` and V2L-010/V2L-011 are complete and the single-pass speed improvement is manually accepted. V2L-012 adds the engine and V2L-013 wires the UI. Source-format extensibility and TXT log export remain future work.
+`V2L-001` through `V2L-008` and V2L-010/V2L-012 are complete and the single-pass speed improvement is manually accepted. V2L-012 staging is disconnected; V2L-013 applies cleaning, V2L-014 publishes safely, and V2L-015 wires the UI. Source-format extensibility and TXT log export remain future work.
