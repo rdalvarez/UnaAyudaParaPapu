@@ -167,7 +167,7 @@ The current application contains a cumulative master-database workflow that is n
     - Readback: `ExcelDataReaderHeaderReader` passes `HeaderReaderConfiguration.Create()` to `CreateReader`; that configuration sets `SinglePassMode = true`. Header discovery calls `Read()` once, uses the resulting `FieldCount`, preserves raw value order and positional normalization, and does not use `RowCount`.
     - Configuration seam test: passed; the productive configuration factory returns `SinglePassMode = true` without reflection or reader abstraction.
     - Runtime harness V2: passed; Release executable started, exposed its main window, closed cleanly through `CloseMainWindow()`, and exited with code 0 without forced termination.
-    - Workbook comparison: pending manual observation by the user with the same private workbook; no performance improvement was measured or claimed here.
+    - Workbook comparison: operator retested the same real workbook and reported that header discovery is now substantially faster; no numeric benchmark was captured.
     - Rollback boundary: revert the single-pass header-reader configuration, its focused seam test, and V2L-008 documentation only; header presentation, plan behavior, UI, and future cleaning semantics remain unchanged.
     - RDD risk: `disabled/unmanaged`; automated assessment classified the small executable configuration change as medium.
     - Commit: `37d7941` (`perf(v2): read workbook headers in single pass`).
@@ -176,7 +176,7 @@ The current application contains a cumulative master-database workflow that is n
 
 - [ ] **V2L-009 — Keep tabular input extensible to CSV**
   - Status: future architecture note only; not authorized for implementation.
-  - Scope: evolve the source boundary so UI, header snapshots, cleaning plans, and future row processing depend on a tabular-source contract rather than an Excel-only implementation. Select the concrete reader by file type (`.xlsx`/`.xls` or `.csv`).
+  - Scope: evolve the source boundary so UI, header snapshots, cleaning plans, and future row processing call one tabular-file reader method that selects the concrete parser internally by file type (`.xlsx`/`.xls`, `.csv`, or text). Every parser returns the same ordered collection contract.
   - CSV considerations: use `CreateCsvReader`, bound initial analysis (for example `AnalyzeInitialCsvRows = 1` for header-only discovery), and explicitly handle delimiter candidates, BOM/fallback encoding, quoted values, and escaping. `SinglePassMode` applies to XLS/XLSX/XLSB and has no effect on CSV.
   - Acceptance: adding CSV later does not change cleaning-plan semantics or UI state; Excel and CSV readers produce the same raw ordered header snapshot and row contract.
   - Evidence: pending.
@@ -192,4 +192,4 @@ The current application contains a cumulative master-database workflow that is n
 
 ## Progress and Next Step
 
-`V2L-001` through `V2L-008` are complete. The user must compare single-pass speed with the same workbook and continue visual review of the ordered plan. CSV extensibility, TXT log export, and cleaning execution remain future work requiring explicit authorization.
+`V2L-001` through `V2L-008` are complete and the single-pass speed improvement is manually accepted. Source-format extensibility is documented but intentionally unimplemented. TXT log export and cleaning execution remain future work requiring explicit authorization.
