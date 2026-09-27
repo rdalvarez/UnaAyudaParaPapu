@@ -72,7 +72,7 @@ Sergio workbooks can contain empty or repeated headers. Persisting those headers
      - Evidence: WPF exposes `Vista previa y cargar` only for a valid owned candidate. It asynchronously obtains one bounded backend preview without rereading Excel, then opens one owner-centered modal dialog with basename-only metadata, row count, selected PK, prior metadata, dynamic schema-order columns, at most 20 rows, a replacement warning, and exact semantic `Cancelar`, `Cargar`, or `Reemplazar` action. Cancel performs no mutation; promotion occurs only after confirmation. Promotion failure keeps the candidate retryable and does not claim replacement; success releases UI ownership without drop, records basename/row count/local timestamp without values or full paths, and disables double promotion. File/PK changes retain SER-003 cleanup behavior; close after success never cleans official data. Focused text-state test added. Verification: Release build without restore, full V2 tests without build, `git diff --check`, and structural readback passed. Runtime GUI smoke: N/A/not run in this environment; no visual acceptance claimed.
      - Rollback: revert the WPF preview dialog, shell text model, MainWindow integration, focused test, README, and this evidence entry; backend SER-004A remains independently usable.
      - RDD: disabled/unmanaged.
-     - Commits: backend `1584382`, backend verification `37a8015`, UI commit recorded after creation.
+     - Commits: backend `1584382`, backend verification `37a8015`, UI `e3533b9` (`feat(v2): confirm and promote sergio load`).
 
 ## Progress
 
