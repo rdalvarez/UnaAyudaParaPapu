@@ -9,26 +9,30 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="12" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="6" />
+            <RowDefinition Height="150" MinHeight="120" />
             <RowDefinition Height="12" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <Border Padding="12" CornerRadius="8" BorderBrush="#FFE6E6E6" BorderThickness="1" Background="#FFFDFDFD">
-            <StackPanel>
-                <TextBlock FontSize="24" FontWeight="Bold" Text="PapaPersonas V2" />
-                <TextBlock Margin="0,4,0,0" Foreground="#FF666666" Text="Preparación y limpieza de archivos Excel" />
-            </StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="360" /></Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock FontSize="24" FontWeight="Bold" Text="PapaPersonas V2" />
+                    <TextBlock Margin="0,4,0,0" Foreground="#FF666666" Text="Preparación y limpieza de archivos Excel" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" x:Name="OperationProgressPanel" VerticalAlignment="Center" Margin="18,0,0,0" AutomationProperties.Name="Estado de la operación" AutomationProperties.LiveSetting="Polite">
+                    <TextBlock x:Name="OperationStatusTextBlock" Text="Sin operaciones en curso." AutomationProperties.Name="Estado de la operación" />
+                    <ProgressBar x:Name="OperationProgressBar" Margin="0,6,0,0" Height="8" IsIndeterminate="False" Value="0" AutomationProperties.Name="Progreso de la operación" />
+                </StackPanel>
+            </Grid>
         </Border>
 
         <TabControl Grid.Row="2">
             <TabItem x:Name="PrepararTab">
                 <Grid Margin="6">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="6" />
-                        <RowDefinition Height="150" MinHeight="120" />
-                    </Grid.RowDefinitions>
-                    <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel Margin="0,0,6,0">
                             <TextBlock FontSize="18" FontWeight="SemiBold" Text="Preparar archivo de Hernán" />
                             <TextBlock Margin="0,4,0,14" Foreground="#FF666666" Text="Seleccione un archivo, arme el plan de limpieza y genere los archivos de salida. La exportación TXT, las fuentes CSV y la persistencia siguen fuera de alcance." TextWrapping="Wrap" />
@@ -45,20 +49,6 @@
                                     <Button x:Name="BrowseFolderButton" Grid.Row="1" Grid.Column="2" Margin="8,4" Content="Buscar carpeta" Click="BrowseFolderButton_OnClick" />
                                 </Grid>
                             </GroupBox>
-
-                            <StackPanel x:Name="OperationProgressPanel"
-                                        Margin="0,12,0,0"
-                                        Visibility="Collapsed"
-                                        AutomationProperties.Name="Estado de la operación"
-                                        AutomationProperties.LiveSetting="Polite">
-                                <TextBlock x:Name="OperationStatusTextBlock"
-                                           Text="Leyendo encabezados..."
-                                           AutomationProperties.Name="Estado de la operación" />
-                                <ProgressBar Margin="0,6,0,0"
-                                             Height="8"
-                                             IsIndeterminate="True"
-                                             AutomationProperties.Name="Progreso de la operación" />
-                            </StackPanel>
 
                             <GroupBox Header="Columnas detectadas" Padding="10" Margin="0,12,0,0">
                                 <ListBox x:Name="DetectedColumnsListBox" Height="110" AutomationProperties.Name="Columnas detectadas">
@@ -98,10 +88,6 @@
                             <Button x:Name="GenerateOutputButton" Margin="0,12,0,0" HorizontalAlignment="Left" Width="220" Content="Generar archivo de salida" IsEnabled="False" Click="GenerateOutputButton_OnClick" AutomationProperties.Name="Generar archivo de salida" />
                         </StackPanel>
                     </ScrollViewer>
-                    <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Center" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" Background="#FFDDDDDD" />
-                    <GroupBox Grid.Row="2" Header="Actividad — los eventos más recientes aparecerán primero" Padding="6">
-                        <TextBox x:Name="ActivityTextBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" FontFamily="Consolas" FontSize="12" Background="#FFF8F8F8" BorderThickness="0" />
-                    </GroupBox>
                 </Grid>
             </TabItem>
             <TabItem x:Name="SergioTab"><TextBlock Margin="12" Text="Disponible en una fase futura." /></TabItem>
@@ -109,7 +95,12 @@
             <TabItem x:Name="ConsultasTab"><TextBlock Margin="12" Text="Disponible en una fase futura." /></TabItem>
         </TabControl>
 
-        <Border Grid.Row="4" Padding="8" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFF9F9F9">
+        <GridSplitter Grid.Row="3" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Center" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" Background="#FFDDDDDD" />
+        <GroupBox Grid.Row="4" Header="Actividad — los eventos más recientes aparecerán primero" Padding="6">
+            <TextBox x:Name="ActivityTextBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" FontFamily="Consolas" FontSize="12" Background="#FFF8F8F8" BorderThickness="0" />
+        </GroupBox>
+
+        <Border Grid.Row="6" Padding="8" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFF9F9F9">
             <TextBlock Text="La limpieza de la Solapa 1 está conectada. TXT, CSV/TXT de entrada, Sergio, Stock, Consultas y persistencia permanecen fuera de alcance." TextWrapping="Wrap" />
         </Border>
     </Grid>

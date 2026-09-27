@@ -141,8 +141,9 @@ public partial class MainWindow : Window
     private void SetBusy(bool isBusy, string? status = null)
     {
         _isBusy = isBusy;
-        OperationProgressPanel.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
-        if (status is not null) OperationStatusTextBlock.Text = status;
+        OperationProgressBar.IsIndeterminate = isBusy;
+        OperationProgressBar.Value = 0;
+        OperationStatusTextBlock.Text = isBusy ? status ?? "Procesando..." : "Sin operaciones en curso.";
         BrowseFileButton.IsEnabled = !isBusy;
         BrowseFolderButton.IsEnabled = !isBusy;
         RejectedFolderLabel.IsEnabled = !isBusy;

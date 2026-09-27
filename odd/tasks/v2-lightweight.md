@@ -291,7 +291,16 @@ The current application contains a cumulative master-database workflow that is n
   - Evidence: Release build passed with 0 warnings/errors; 41/41 tests passed; independent read-only verification passed. Structural readback confirms full-width staging/cycles, projection after cleaning, and unmodified rejected consolidation. Tests cover reordered selections, empty/duplicate headers, CSV quoting/CRLF/Unicode, invalid selections before workspace preparation, unselected rule columns, and all-selected compatibility. Test roots use `Path.GetTempPath()` only; production LocalAppData is not used.
   - Rollback: revert the V2L-017 UI selection state, clean-output projector/coordinator wiring, focused tests, README note, and this task entry; prior full-width clean/rejected behavior is restored.
   - RDD risk: `disabled/unmanaged`.
-  - Commit: this work-unit commit (`feat(v2): select clean output columns`).
+   - Commit: this work-unit commit (`feat(v2): select clean output columns`).
+
+- [x] **V2L-018 — Share global progress and activity surfaces**
+  - Objective: make progress/status and the Paso 1 activity console global, shared by every tab, and permanently visible.
+  - Route: delegated direct.
+  - Acceptance: the header places title/subtitle beside one idle/busy progress panel; the TabControl is followed by one adjustable splitter and newest-first activity console with initial height approximately 150 and minimum 120; PrepararTab contains only its content; future tabs remain disabled.
+  - Evidence: `dotnet build V2/PapaPersonas.sln -c Release --no-restore` passed with 0 warnings and 0 errors; `dotnet test V2/PapaPersonas.sln -c Release --no-build` passed with 41 tests, 0 failures, and 0 skips; `git diff --check` passed. Structural readback confirms one global `ActivityTextBox`, one global `OperationProgressPanel`/`ProgressBar`, no progress `Visibility` toggling, idle reset in `SetBusy(false)`, a global splitter with `MinHeight="120"`, and four tabs with only Preparar enabled through the existing catalog. Bounded launch/close smoke passed; visual acceptance is not claimed.
+  - Rollback: revert the global MainWindow layout/progress changes, README note, and this task entry; cleaning behavior, outputs, and tab availability remain unchanged.
+  - RDD risk: `disabled/unmanaged`.
+  - Commit: pending until commit (`feat(v2): share global progress and activity`).
 
 ## Confirmed Future Cleaning Semantics
 
@@ -304,4 +313,4 @@ The current application contains a cumulative master-database workflow that is n
 
 ## Progress and Next Step
 
-`V2L-001` through `V2L-008`, V2L-010 through V2L-015 are complete and the single-pass speed improvement is manually accepted. The next step is a manual smoke with a representative workbook, followed only by explicitly authorized fixes. TXT export and CSV/TXT input remain future work.
+`V2L-001` through `V2L-008`, V2L-010 through V2L-018 are complete and the single-pass speed improvement is manually accepted. The next step is a manual smoke with a representative workbook, followed only by explicitly authorized fixes. TXT export and CSV/TXT input remain future work.
