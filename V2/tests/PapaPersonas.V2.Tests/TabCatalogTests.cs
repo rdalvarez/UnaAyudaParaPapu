@@ -43,4 +43,60 @@ public sealed class TabCatalogTests
 
         Assert.Equal(["second", "first"], log.Entries);
     }
+
+    [Fact]
+    public void CleaningPlanAddsOrderedStepsWithColumnIdentity()
+    {
+        var plan = new CleaningPlan();
+        var cuit = new DetectedColumn(2, "CUIT");
+        var codigoOs = new DetectedColumn(5, "CODIGO OS");
+
+        plan.Add(CleaningAction.RemoveDuplicates, cuit);
+        plan.Add(CleaningAction.RemoveEmptyValues, codigoOs);
+
+        Assert.Collection(
+            plan.Steps,
+            first =>
+            {
+                Assert.Equal(CleaningAction.RemoveDuplicates, first.Action);
+                Assert.Equal(2, first.ColumnPosition);
+                Assert.Equal("CUIT", first.ColumnName);
+                Assert.Equal(1, first.StepNumber);
+            },
+            second =>
+            {
+                Assert.Equal(CleaningAction.RemoveEmptyValues, second.Action);
+                Assert.Equal(5, second.ColumnPosition);
+                Assert.Equal("CODIGO OS", second.ColumnName);
+                Assert.Equal(2, second.StepNumber);
+            });
+    }
+
+    [Fact]
+    public void CleaningPlanClearReturnsRemovedCountAndAllowsRepeatedSteps()
+    {
+        var plan = new CleaningPlan();
+        var column = new DetectedColumn(0, "CUIT");
+
+        plan.Add(CleaningAction.RemoveDuplicates, column);
+        plan.Add(CleaningAction.RemoveDuplicates, column);
+
+        Assert.Equal(2, plan.Clear());
+        Assert.Empty(plan.Steps);
+        Assert.Equal(0, plan.Clear());
+    }
+
+    [Fact]
+    public void CleaningPlanVisibleRepresentationIsDeterministic()
+    {
+        var plan = new CleaningPlan();
+        var column = new DetectedColumn(0, "CUIT");
+
+        plan.Add(CleaningAction.RemoveDuplicates, column);
+        plan.Add(CleaningAction.RemoveEmptyValues, column);
+
+        Assert.Equal(
+            ["1. Quitar duplicados por CUIT", "2. Quitar valores vacíos por CUIT"],
+            plan.Steps.Select(step => step.VisibleDescription));
+    }
 }

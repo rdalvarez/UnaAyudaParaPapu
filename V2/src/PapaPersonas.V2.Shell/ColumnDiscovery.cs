@@ -5,6 +5,48 @@ namespace PapaPersonas.V2.Shell;
 
 public sealed record DetectedColumn(int Position, string DisplayName);
 
+public enum CleaningAction
+{
+    RemoveDuplicates,
+    RemoveEmptyValues
+}
+
+public sealed record CleaningPlanStep(
+    CleaningAction Action,
+    int ColumnPosition,
+    string ColumnName,
+    int StepNumber)
+{
+    public string VisibleDescription =>
+        $"{StepNumber}. {Action switch
+        {
+            CleaningAction.RemoveDuplicates => "Quitar duplicados",
+            CleaningAction.RemoveEmptyValues => "Quitar valores vacíos",
+            _ => throw new ArgumentOutOfRangeException()
+        }} por {ColumnName}";
+}
+
+public sealed class CleaningPlan
+{
+    private readonly List<CleaningPlanStep> _steps = [];
+
+    public IReadOnlyList<CleaningPlanStep> Steps => _steps;
+
+    public CleaningPlanStep Add(CleaningAction action, DetectedColumn column)
+    {
+        var step = new CleaningPlanStep(action, column.Position, column.DisplayName, _steps.Count + 1);
+        _steps.Add(step);
+        return step;
+    }
+
+    public int Clear()
+    {
+        var removed = _steps.Count;
+        _steps.Clear();
+        return removed;
+    }
+}
+
 public static class HeaderPresentation
 {
     public static IReadOnlyList<DetectedColumn> Normalize(IReadOnlyList<string?> headers)

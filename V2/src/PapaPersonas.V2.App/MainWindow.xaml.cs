@@ -10,6 +10,7 @@ public partial class MainWindow : Window
 {
     private readonly IHeaderReader _headerReader = new ExcelDataReaderHeaderReader();
     private readonly ActivityLog _activityLog = new();
+    private readonly CleaningPlan _cleaningPlan = new();
     private string? _rejectedFolderPath;
 
     public MainWindow()
@@ -69,6 +70,7 @@ public partial class MainWindow : Window
             InputFileTextBox.Text = path;
             RejectedFolderTextBox.Text = rejectedFolder;
             _rejectedFolderPath = rejectedFolder;
+            ResetCleaningPlan();
             SetColumns(columns);
             AddActivity($"Archivo seleccionado: {Path.GetFileName(path)}");
             AddActivity($"Carpeta de rechazados: {rejectedFolder}");
@@ -118,6 +120,7 @@ public partial class MainWindow : Window
         EmptyColumnComboBox.ItemsSource = columns;
         DuplicateColumnComboBox.IsEnabled = columns.Count > 0;
         EmptyColumnComboBox.IsEnabled = columns.Count > 0;
+        UpdateCleaningControls();
     }
 
     private void SetBusy(bool isBusy)
@@ -127,6 +130,67 @@ public partial class MainWindow : Window
         BrowseFolderButton.IsEnabled = !isBusy;
         RejectedFolderLabel.IsEnabled = !isBusy;
         RejectedFolderTextBox.IsEnabled = !isBusy;
+        UpdateCleaningControls();
+    }
+
+    private void CleaningColumnComboBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        UpdateCleaningControls();
+
+    private void RemoveDuplicatesButton_OnClick(object sender, RoutedEventArgs e) =>
+        AddCleaningStep(CleaningAction.RemoveDuplicates, DuplicateColumnComboBox.SelectedItem as DetectedColumn);
+
+    private void RemoveEmptyValuesButton_OnClick(object sender, RoutedEventArgs e) =>
+        AddCleaningStep(CleaningAction.RemoveEmptyValues, EmptyColumnComboBox.SelectedItem as DetectedColumn);
+
+    private void AddCleaningStep(CleaningAction action, DetectedColumn? column)
+    {
+        if (column is null)
+        {
+            return;
+        }
+
+        var step = _cleaningPlan.Add(action, column);
+        RefreshCleaningPlanPresentation();
+        AddActivity($"Paso de limpieza agregado: {step.VisibleDescription}");
+    }
+
+    private void ClearCleaningPlanButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        var removed = _cleaningPlan.Clear();
+        RefreshCleaningPlanPresentation();
+        AddActivity($"Plan de limpieza limpiado: {removed} pasos eliminados.");
+    }
+
+    private void ResetCleaningPlan()
+    {
+        var removed = _cleaningPlan.Clear();
+        DuplicateColumnComboBox.SelectedItem = null;
+        EmptyColumnComboBox.SelectedItem = null;
+        RefreshCleaningPlanPresentation();
+        if (removed > 0)
+        {
+            AddActivity($"Plan de limpieza reiniciado: {removed} pasos eliminados.");
+        }
+    }
+
+    private void RefreshCleaningPlanPresentation()
+    {
+        CleaningPlanListBox.ItemsSource = null;
+        CleaningPlanListBox.ItemsSource = _cleaningPlan.Steps;
+        CleaningPlanSummaryTextBlock.Text = _cleaningPlan.Steps.Count == 0
+            ? "Plan vacío."
+            : $"Plan de limpieza: {_cleaningPlan.Steps.Count} paso(s).";
+        UpdateCleaningControls();
+    }
+
+    private void UpdateCleaningControls()
+    {
+        var isBusy = HeaderReadingProgressPanel.Visibility == Visibility.Visible;
+        DuplicateColumnComboBox.IsEnabled = !isBusy && DuplicateColumnComboBox.Items.Count > 0;
+        EmptyColumnComboBox.IsEnabled = !isBusy && EmptyColumnComboBox.Items.Count > 0;
+        RemoveDuplicatesButton.IsEnabled = !isBusy && DuplicateColumnComboBox.SelectedItem is DetectedColumn;
+        RemoveEmptyValuesButton.IsEnabled = !isBusy && EmptyColumnComboBox.SelectedItem is DetectedColumn;
+        ClearCleaningPlanButton.IsEnabled = !isBusy && _cleaningPlan.Steps.Count > 0;
     }
 
     private void AddActivity(string message)

@@ -63,19 +63,27 @@
                                 <ListBox x:Name="DetectedColumnsListBox" Height="72" DisplayMemberPath="DisplayName" AutomationProperties.Name="Columnas detectadas" />
                             </GroupBox>
 
-                            <GroupBox Header="Limpieza (no disponible en esta fase)" Padding="10" Margin="0,12,0,0">
+                            <GroupBox Header="Limpieza" Padding="10" Margin="0,12,0,0">
                                 <Grid>
-                                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="170" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                     <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Duplicados" />
-                                    <ComboBox x:Name="DuplicateColumnComboBox" Grid.Row="0" Grid.Column="1" Margin="8,4" DisplayMemberPath="DisplayName" IsEnabled="False" AutomationProperties.Name="Columna para duplicados" />
-                                    <Button Grid.Row="0" Grid.Column="2" Margin="8,4" Content="Quitar duplicados" IsEnabled="False" />
+                                    <ComboBox x:Name="DuplicateColumnComboBox" Grid.Row="0" Grid.Column="1" Margin="8,4" DisplayMemberPath="DisplayName" IsEnabled="False" SelectionChanged="CleaningColumnComboBox_OnSelectionChanged" AutomationProperties.Name="Columna para duplicados" />
+                                    <Button x:Name="RemoveDuplicatesButton" Grid.Row="0" Grid.Column="2" Margin="8,4" Content="Quitar duplicados" IsEnabled="False" Click="RemoveDuplicatesButton_OnClick" />
                                     <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Valores vacíos" />
-                                    <ComboBox x:Name="EmptyColumnComboBox" Grid.Row="1" Grid.Column="1" Margin="8,4" DisplayMemberPath="DisplayName" IsEnabled="False" AutomationProperties.Name="Columna para vacíos" />
-                                    <Button Grid.Row="1" Grid.Column="2" Margin="8,4" Content="Quitar valores vacíos" IsEnabled="False" />
-                                    <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,8,0,0" Foreground="#FF777777" Text="La limpieza todavía no está disponible." />
+                                    <ComboBox x:Name="EmptyColumnComboBox" Grid.Row="1" Grid.Column="1" Margin="8,4" DisplayMemberPath="DisplayName" IsEnabled="False" SelectionChanged="CleaningColumnComboBox_OnSelectionChanged" AutomationProperties.Name="Columna para vacíos" />
+                                    <Button x:Name="RemoveEmptyValuesButton" Grid.Row="1" Grid.Column="2" Margin="8,4" Content="Quitar valores vacíos" IsEnabled="False" Click="RemoveEmptyValuesButton_OnClick" />
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,8,0,0" Foreground="#FF777777" Text="Las acciones agregan pasos al plan; todavía no se leen ni modifican filas." TextWrapping="Wrap" />
+                                    <Grid Grid.Row="3" Grid.ColumnSpan="3" Margin="0,12,0,0">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" FontSize="15" FontWeight="SemiBold" Text="Plan de limpieza" />
+                                        <Button x:Name="ClearCleaningPlanButton" Grid.Column="1" Content="Limpiar plan" IsEnabled="False" Click="ClearCleaningPlanButton_OnClick" />
+                                    </Grid>
                                 </Grid>
                             </GroupBox>
+
+                            <ListBox x:Name="CleaningPlanListBox" Margin="0,8,0,0" MinHeight="42" DisplayMemberPath="VisibleDescription" AutomationProperties.Name="Pasos del plan de limpieza" />
+                            <TextBlock x:Name="CleaningPlanSummaryTextBlock" Margin="0,4,0,0" Foreground="#FF666666" Text="Plan vacío." />
 
                             <GroupBox Header="Resumen y estado del ciclo" Padding="10" Margin="0,12,0,0">
                                 <TextBlock Text="Sin ciclo iniciado. No se han leído ni modificado archivos." TextWrapping="Wrap" />
