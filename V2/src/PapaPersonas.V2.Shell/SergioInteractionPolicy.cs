@@ -25,8 +25,6 @@ public static class SergioInteractionPolicy
         result.DuplicateRows,
         result.TotalRows - result.ValidRows);
 
-    public static bool ContinueAutomatically(SergioStagingPresentation presentation) => !presentation.DecisionRequired;
-
     public static string RejectionDecisionMessage(SergioStagingPresentation presentation) =>
         $"Clave primaria seleccionada: {presentation.SelectedPrimaryKey}. " +
         $"Importadas: {presentation.ImportedRows}. Válidas: {presentation.ValidRows}. " +

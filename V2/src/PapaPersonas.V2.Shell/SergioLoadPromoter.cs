@@ -16,13 +16,6 @@ public sealed record SergioPreview(
     public long RejectedRows => TotalRows - ValidRows;
 }
 
-public static class SergioPreviewExtensions
-{
-    public static long ImportedRows(this SergioPreview preview) => preview.ImportedRows;
-    public static long ValidRows(this SergioPreview preview) => preview.ValidRows;
-    public static long RejectedRows(this SergioPreview preview) => preview.RejectedRows;
-}
-
 public sealed record SergioLoadMetadata(
     string SourceFileName,
     DateTime LoadedAtUtc,

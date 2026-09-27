@@ -44,8 +44,7 @@ public sealed record SergioStagingResult(
     long DuplicateGroups,
     long DuplicateRows,
     bool IsValid,
-    bool HasRejections,
-    bool CanPromote);
+    bool HasRejections);
 
 public static class SergioCellTextFormatter
 {
@@ -231,15 +230,6 @@ public sealed class SergioStagingAnalyzer
         }
     }
 
-    internal void ReleaseCandidate(string candidateTableName)
-    {
-        lock (sync) ownedCandidates.Remove(candidateTableName);
-    }
-    internal void RetainAsLastImport(string candidateTableName)
-    {
-        using var transition = PrepareLastImportTransition(candidateTableName, null);
-        transition.Complete();
-    }
     internal AnalyzerOwnershipTransition PrepareLastImportTransition(string candidateTableName, string? selectedPrimaryKeyAlias)
     {
         if (string.Equals(candidateTableName, SergioLoadPromoter.LastImportTableName, StringComparison.Ordinal))
@@ -383,7 +373,7 @@ public sealed class SergioStagingAnalyzer
         var duplicateRows = reader.GetInt64(3);
         var groups = reader.GetInt64(4);
         var isValid = total > 0 && empty == 0 && duplicateRows == 0;
-        return new SergioStagingResult(table, [], key, string.Empty, total, valid, empty, groups, duplicateRows, isValid, total != valid, isValid);
+        return new SergioStagingResult(table, [], key, string.Empty, total, valid, empty, groups, duplicateRows, isValid, total != valid);
     }
 
     private static void ValidateRequest(SergioStagingRequest request)

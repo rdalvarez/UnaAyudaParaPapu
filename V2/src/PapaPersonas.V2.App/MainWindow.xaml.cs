@@ -174,7 +174,6 @@ public partial class MainWindow : Window
         SergioHeadersListBox.ItemsSource = result.Columns.Select(column => $"{column.Position + 1}. {DisplayHeader(column.RawName)} → {column.ProposedAlias}").ToArray();
         SergioPrimaryKeyComboBox.ItemsSource = SergioPrimaryKeySelection.Options(result.Columns);
         SergioPrimaryKeyComboBox.SelectedItem = SergioPrimaryKeySelection.DefaultAlias(result.Columns);
-        SergioPrimaryKeyComboBox.IsEnabled = true;
         SergioSummaryTextBlock.Text = result.HasReservedTechnicalAlias
             ? $"Advertencia: la columna técnica {SergioSchemaNames.RejectionReason} del archivo será ignorada y reutilizada en staging; el archivo original no se modifica. Seleccione la clave primaria y valide."
             : "Estado: encabezados aceptados; seleccione la clave primaria y valide.";
@@ -191,7 +190,6 @@ public partial class MainWindow : Window
         SergioHeadersListBox.ItemsSource = null;
         SergioPrimaryKeyComboBox.ItemsSource = null;
         SergioPrimaryKeyComboBox.SelectedItem = null;
-        SergioPrimaryKeyComboBox.IsEnabled = false;
         SergioSummaryTextBlock.Text = "Estado: falta aceptar archivo, encabezados y clave primaria.";
         UpdateSergioControls();
     }
@@ -250,14 +248,11 @@ public partial class MainWindow : Window
         OperationStatusTextBlock.Text = isBusy ? status ?? "Procesando..." : "Sin operaciones en curso.";
         BrowseFileButton.IsEnabled = !isBusy;
         SergioBrowseFileButton.IsEnabled = !isBusy;
-        SergioPrimaryKeyComboBox.IsEnabled = !isBusy && _acceptedSergioHeaders is not null;
-        SergioValidateButton.IsEnabled = !isBusy && _acceptedSergioHeaders is not null && SergioPrimaryKeyComboBox.SelectedItem is string;
-        SergioPreviewButton.IsEnabled = !isBusy && _sergioCandidateTable is not null && (_sergioStagingResult?.ValidRows ?? 0) > 0;
-        SergioExportRejectedButton.IsEnabled = !isBusy && HasCurrentSergioExportSource();
         BrowseFolderButton.IsEnabled = !isBusy;
         RejectedFolderLabel.IsEnabled = !isBusy;
         RejectedFolderTextBox.IsEnabled = !isBusy;
         DetectedColumnsListBox.IsEnabled = !isBusy;
+        UpdateSergioControls();
         UpdateCleaningControls();
     }
 
@@ -388,6 +383,7 @@ public partial class MainWindow : Window
 
     private void UpdateSergioControls()
     {
+        SergioPrimaryKeyComboBox.IsEnabled = !_isBusy && _acceptedSergioHeaders is not null;
         SergioValidateButton.IsEnabled = !_isBusy && File.Exists(_acceptedSergioFilePath) && _acceptedSergioHeaders?.Columns.Count > 0 && SergioPrimaryKeyComboBox.SelectedItem is string;
         SergioPreviewButton.IsEnabled = !_isBusy && _sergioCandidateTable is not null && (_sergioStagingResult?.ValidRows ?? 0) > 0;
         SergioExportRejectedButton.IsEnabled = !_isBusy && HasCurrentSergioExportSource();

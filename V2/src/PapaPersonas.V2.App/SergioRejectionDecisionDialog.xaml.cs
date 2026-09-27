@@ -11,7 +11,6 @@ public partial class SergioRejectionDecisionDialog : Window
         MessageTextBlock.Text = SergioInteractionPolicy.RejectionDecisionMessage(presentation);
     }
 
-    public bool Accepted { get; private set; }
-    private void ContinueButton_OnClick(object sender, RoutedEventArgs e) { Accepted = true; DialogResult = true; }
-    private void CancelButton_OnClick(object sender, RoutedEventArgs e) { Accepted = false; DialogResult = false; }
+    private void ContinueButton_OnClick(object sender, RoutedEventArgs e) { DialogResult = true; }
+    private void CancelButton_OnClick(object sender, RoutedEventArgs e) { DialogResult = false; }
 }

@@ -30,8 +30,7 @@ public sealed class SergioStagingTests
         var zeroValid = mixed with { ValidRows = 0, RejectedRows = 5 };
 
         Assert.True(mixed.DecisionRequired);
-        Assert.False(SergioInteractionPolicy.ContinueAutomatically(mixed));
-        Assert.True(SergioInteractionPolicy.ContinueAutomatically(clean));
+        Assert.False(clean.DecisionRequired);
         Assert.False(zeroValid.CanPreviewOrPromote);
         Assert.True(zeroValid.CanExport);
     }
