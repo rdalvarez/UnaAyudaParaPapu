@@ -40,13 +40,13 @@ Sergio workbooks can contain empty or repeated headers. Persisting those headers
   - Commit: `87acc93` (`feat(v2): add sergio header preflight`).
 
 - [x] **SER-002 — Prioritize primary-key candidates**
-  - Route: direct implementation; no delegation.
+  - Route: delegated direct because selector policy, UI wiring, tests, and task evidence span multiple files.
   - Acceptance: available exact aliases `CUIL`, `CUIT`, and `DNI` appear first in that order; all remaining aliases preserve source order; exact `CUIL` remains the only automatic default; the operator can select any available alias; duplicate suffixed aliases remain later independent choices.
   - Checks: focused selector tests, Release build, complete V2 tests, and structural readback.
   - Rollback: revert only primary-key option ordering and this task evidence.
   - Evidence: `SergioPrimaryKeySelection.Options` returns only detected aliases, promotes available exact case-sensitive `CUIL`, `CUIT`, and `DNI` in that order, then preserves all other aliases in source order without duplicates. Suffix aliases such as `CUIL (1)` remain in the source-order remainder. `DefaultAlias` selects only exact `CUIL`; when absent, the ComboBox remains unselected and the existing warning is preserved. `MainWindow` binds the ComboBox to the pure options function and performs no row, value, DuckDB, or anomaly-preflight work. Tests cover arbitrary ordering, absent preferred aliases, case sensitivity, suffixed aliases, deduplication, alias preservation, and exact-CUIL-only defaulting. Verification: `dotnet build V2/PapaPersonas.sln -c Release --no-restore`; `dotnet test V2/PapaPersonas.sln -c Release --no-build`; `git diff --check`; structural readback confirmed exact priority/default policy and no row/DB work. Bounded launch/close smoke: not run in this environment; visual acceptance is not claimed.
   - RDD: disabled/unmanaged.
-  - Commit: `fbe6106` (`feat(v2): prioritize sergio primary keys`).
+  - Commit: `31bc336` (`feat(v2): prioritize sergio primary keys`).
 
 ## Progress
 
