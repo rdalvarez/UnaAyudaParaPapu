@@ -83,7 +83,7 @@ public sealed class SergioLoadPromoter
             var oldImport = RenameAside(connection, transaction, LastImportTableName, "import");
             Execute(connection, transaction, $"ALTER TABLE {SergioSql.Quote(candidateTableName)} RENAME TO {SergioSql.Quote(LastImportTableName)}");
             afterOfficialReplacement?.Invoke();
-            Execute(connection, transaction, $"CREATE TABLE IF NOT EXISTS {SergioSql.Quote(MetadataTableName)} (source_file_name VARCHAR, loaded_at_utc TIMESTAMP, row_count BIGINT, selected_primary_key_alias VARCHAR, schema_version VARCHAR)");
+            Execute(connection, transaction, SergioLoadMetadataSchema.CreateTableSql(SergioSql.Quote(MetadataTableName)));
             Execute(connection, transaction, $"DELETE FROM {SergioSql.Quote(MetadataTableName)}");
             using var insert = connection.CreateCommand();
             insert.Transaction = transaction;
@@ -141,7 +141,10 @@ public sealed class SergioLoadPromoter
     private static SergioLoadMetadata? ReadMetadata(DuckDBConnection c)
     {
         if (!TableExists(c, MetadataTableName)) return null;
-        using var cmd = c.CreateCommand(); cmd.CommandText = $"SELECT source_file_name, loaded_at_utc, row_count, selected_primary_key_alias, schema_version FROM {SergioSql.Quote(MetadataTableName)} LIMIT 1";
+        using var cmd = c.CreateCommand();
+        cmd.CommandText =
+            $"SELECT {SergioLoadMetadataSchema.SourceFileNameColumn}, {SergioLoadMetadataSchema.LoadedAtUtcColumn}, {SergioLoadMetadataSchema.RowCountColumn}, {SergioLoadMetadataSchema.SelectedPrimaryKeyAliasColumn}, {SergioLoadMetadataSchema.SchemaVersionColumn} " +
+            $"FROM {SergioSql.Quote(MetadataTableName)} LIMIT 1";
         using var r = cmd.ExecuteReader(); if (!r.Read()) return null;
         return new SergioLoadMetadata(r.GetString(0), r.GetDateTime(1), r.GetInt64(2), r.GetString(3), r.IsDBNull(4) ? null : r.GetString(4));
     }
