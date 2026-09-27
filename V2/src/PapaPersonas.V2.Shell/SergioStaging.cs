@@ -79,7 +79,7 @@ public sealed class SergioStagingAnalyzer
 {
     private readonly DuckDbPathPolicy pathPolicy;
     private readonly IWorkbookRowCursorFactory cursorFactory;
-    private readonly HashSet<string> ownedCandidates = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> ownedCandidates = new(StringComparer.Ordinal);
     private readonly object sync = new();
 
     public SergioStagingAnalyzer(DuckDbPathPolicy? pathPolicy = null, IWorkbookRowCursorFactory? cursorFactory = null)
@@ -106,11 +106,12 @@ public sealed class SergioStagingAnalyzer
             using var cursor = cursorFactory.Open(request.WorkbookPath);
             ValidateHeaders(cursor.Headers, request.AcceptedHeaders);
             var acceptedAliases = request.AcceptedHeaders.Columns.Select(column => column.ProposedAlias).ToArray();
+            var acceptedColumns = request.AcceptedHeaders.Columns.ToDictionary(column => column.ProposedAlias, StringComparer.Ordinal);
             var reasonColumn = SergioSchemaNames.RejectionReason;
             var schemaAliases = acceptedAliases.Contains(reasonColumn, StringComparer.Ordinal) ? acceptedAliases : [.. acceptedAliases, reasonColumn];
             var aliases = acceptedAliases.Where(alias => !string.Equals(alias, reasonColumn, StringComparison.Ordinal)).ToArray();
             candidate = CreateCandidateName();
-            lock (sync) ownedCandidates.Add(candidate);
+            lock (sync) ownedCandidates.Add(candidate, request.SelectedPrimaryKeyAlias);
             using var connection = Open(databasePath);
             using var transaction = connection.BeginTransaction();
             Execute(connection, transaction, $"CREATE TABLE {Quote(candidate)} ({string.Join(", ", schemaAliases.Select(alias => $"{Quote(alias)} VARCHAR"))})");
@@ -125,7 +126,16 @@ public sealed class SergioStagingAnalyzer
 
                     var values = new object?[schemaAliases.Length];
                     for (var index = 0; index < values.Length; index++)
-                        values[index] = string.Equals(schemaAliases[index], reasonColumn, StringComparison.Ordinal) ? null : index < cursor.CurrentRow.Count ? SergioCellTextFormatter.Format(cursor.CurrentRow[index]) : null;
+                    {
+                        if (string.Equals(schemaAliases[index], reasonColumn, StringComparison.Ordinal))
+                        {
+                            values[index] = null;
+                            continue;
+                        }
+
+                        var sourcePosition = acceptedColumns[schemaAliases[index]].Position;
+                        values[index] = sourcePosition < cursor.CurrentRow.Count ? SergioCellTextFormatter.Format(cursor.CurrentRow[sourcePosition]) : null;
+                    }
                     appender.AppendRow(row =>
                     {
                         foreach (var value in values)
@@ -172,7 +182,7 @@ public sealed class SergioStagingAnalyzer
 
     private void CleanupCore(string candidateTableName)
     {
-        if (!ownedCandidates.Contains(candidateTableName)) return;
+        if (!ownedCandidates.ContainsKey(candidateTableName)) return;
         try
         {
             using var connection = Open(pathPolicy.GetDatabasePath());
@@ -186,14 +196,23 @@ public sealed class SergioStagingAnalyzer
     {
         lock (sync)
         {
-            string[] candidates = ownedCandidates.ToArray();
+            string[] candidates = ownedCandidates.Keys.ToArray();
             foreach (var candidate in candidates) CleanupCore(candidate);
         }
     }
 
     internal IDisposable AcquirePromotionLock() => new PromotionLock(sync);
-    internal bool OwnsCandidate(string candidateTableName) => ownedCandidates.Contains(candidateTableName);
-    internal void ReleaseCandidate(string candidateTableName) => ownedCandidates.Remove(candidateTableName);
+    internal bool OwnsCandidate(string candidateTableName, string selectedPrimaryKeyAlias)
+    {
+        lock (sync)
+            return ownedCandidates.TryGetValue(candidateTableName, out var ownedKey) &&
+                string.Equals(ownedKey, selectedPrimaryKeyAlias, StringComparison.Ordinal);
+    }
+
+    internal void ReleaseCandidate(string candidateTableName)
+    {
+        lock (sync) ownedCandidates.Remove(candidateTableName);
+    }
     internal string DatabasePath => pathPolicy.GetDatabasePath();
     private sealed class PromotionLock : IDisposable
     {
@@ -225,7 +244,7 @@ public sealed class SergioStagingAnalyzer
             while (reader.Read())
             {
                 var name = reader.GetString(0);
-                if (IsReservedCandidateName(name) && !ownedCandidates.Contains(name)) staleCandidates.Add(name);
+                if (IsReservedCandidateName(name) && !ownedCandidates.ContainsKey(name)) staleCandidates.Add(name);
             }
 
             foreach (var candidate in staleCandidates)
@@ -318,7 +337,7 @@ public sealed class SergioStagingAnalyzer
     private static bool IsReservedCandidateName(string name) => name.StartsWith("sergio_staging_", StringComparison.Ordinal) && name.Length == 47 && name[15..].All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
     private bool IsOwnedName(string name)
     {
-        lock (sync) return ownedCandidates.Contains(name);
+        lock (sync) return ownedCandidates.ContainsKey(name);
     }
 }
 

@@ -90,6 +90,23 @@ public sealed class SergioStagingTests
     }
 
     [Fact]
+    public void ReservedColumnInTheMiddleDoesNotShiftFollowingBusinessValues()
+    {
+        using var workspace = new TestWorkspace();
+        var workbook = workspace.CreateWorkbook(["CUIL", SergioSchemaNames.RejectionReason, "Nombre"], [["20-1", "hostile source reason", "Ana"]]);
+        var analyzer = new SergioStagingAnalyzer(new DuckDbPathPolicy(workspace.DatabasePath));
+
+        var result = analyzer.Analyze(new SergioStagingRequest(workbook, SergioHeaderPreflight.Analyze(["CUIL", SergioSchemaNames.RejectionReason, "Nombre"]), "CUIL"));
+
+        using var verify = Open(workspace.DatabasePath);
+        Assert.Equal(["CUIL", "Nombre"], result.Aliases);
+        Assert.Equal("20-1", ReadValue(verify, result.CandidateTableName, "CUIL"));
+        Assert.Equal("Ana", ReadValue(verify, result.CandidateTableName, "Nombre"));
+        Assert.Null(ReadNullableValue(verify, result.CandidateTableName, SergioSchemaNames.RejectionReason));
+        analyzer.Cleanup(result.CandidateTableName);
+    }
+
+    [Fact]
     public void ReservedPrimaryKeyRequestIsRejected()
     {
         using var workspace = new TestWorkspace();
@@ -289,6 +306,43 @@ public sealed class SergioStagingTests
         using var verify = Open(workspace.DatabasePath);
         Assert.False(TableExists(verify, "sergio_current"));
         Assert.False(TableExists(verify, "sergio_load_metadata"));
+    }
+
+    [Fact]
+    public void ForgedDifferentSelectedKeyIsRejectedForPreviewAndPromotionWithoutMutation()
+    {
+        using var workspace = new TestWorkspace();
+        var analyzer = new SergioStagingAnalyzer(new DuckDbPathPolicy(workspace.DatabasePath));
+        var staged = analyzer.Analyze(new SergioStagingRequest(workspace.CreateWorkbook(["CUIL", "Nombre"], [["20-1", "Ana"]]), SergioHeaderPreflight.Analyze(["CUIL", "Nombre"]), "CUIL"));
+        var promoter = new SergioLoadPromoter(analyzer);
+
+        Assert.Throws<InvalidOperationException>(() => promoter.Preview(staged.CandidateTableName, "Nombre", staged.CandidateTableName));
+        Assert.Throws<InvalidOperationException>(() => promoter.Promote(staged.CandidateTableName, "Nombre", staged.CandidateTableName));
+        using var verify = Open(workspace.DatabasePath);
+        Assert.True(TableExists(verify, staged.CandidateTableName));
+        Assert.False(TableExists(verify, SergioLoadPromoter.OfficialTableName));
+        analyzer.Cleanup(staged.CandidateTableName);
+    }
+
+    [Fact]
+    public void ZeroRowCandidateIsRejectedWithoutTouchingOfficialOrMetadata()
+    {
+        using var workspace = new TestWorkspace();
+        var analyzer = new SergioStagingAnalyzer(new DuckDbPathPolicy(workspace.DatabasePath));
+        var old = Stage(workspace, analyzer, "old.xlsx", "old");
+        var promoter = new SergioLoadPromoter(analyzer);
+        promoter.Promote(old.CandidateTableName, "CUIL", old.Workbook);
+        var empty = Stage(workspace, analyzer, "empty.xlsx", "empty");
+        using (var connection = Open(workspace.DatabasePath))
+        using (var command = connection.CreateCommand()) { command.CommandText = $"DELETE FROM \"{empty.CandidateTableName}\""; command.ExecuteNonQuery(); }
+
+        Assert.Throws<InvalidOperationException>(() => promoter.Preview(empty.CandidateTableName, "CUIL", empty.Workbook));
+        Assert.Throws<InvalidOperationException>(() => promoter.Promote(empty.CandidateTableName, "CUIL", empty.Workbook));
+        using var verify = Open(workspace.DatabasePath);
+        Assert.Equal("old", ReadValue(verify, SergioLoadPromoter.OfficialTableName, "CUIL"));
+        Assert.Equal("old.xlsx", ReadValue(verify, SergioLoadPromoter.MetadataTableName, "source_file_name"));
+        Assert.True(TableExists(verify, empty.CandidateTableName));
+        analyzer.Cleanup(empty.CandidateTableName);
     }
 
     private static DuckDBConnection Open(string path) { var connection = new DuckDBConnection(new DuckDBConnectionStringBuilder { DataSource = path }.ConnectionString); connection.Open(); return connection; }
