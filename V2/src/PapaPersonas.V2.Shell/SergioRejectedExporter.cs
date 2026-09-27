@@ -10,37 +10,47 @@ public sealed record SergioRejectedExportResult(long RejectedCount, string? Outp
 
 public interface ISergioRejectedFilePublisher
 {
-    string Publish(string workbookPath, DateTime timestamp, Action<string> writePartial);
+    string Publish(string workbookPath, DateTime timestamp, Action<Stream> writePartial);
 }
 
 public sealed class SergioRejectedFilePublisher : ISergioRejectedFilePublisher
 {
-    public string Publish(string workbookPath, DateTime timestamp, Action<string> writePartial)
+    public string Publish(string workbookPath, DateTime timestamp, Action<Stream> writePartial)
     {
         var directory = Path.GetDirectoryName(Path.GetFullPath(workbookPath))!;
         var rejectedDirectory = Path.Combine(directory, "rech");
         var baseName = Path.GetFileNameWithoutExtension(workbookPath);
         var stamp = timestamp.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
 
-        for (var suffix = 1; ; suffix++)
+        Directory.CreateDirectory(rejectedDirectory);
+        var partialPath = Path.Combine(rejectedDirectory,
+            $".{baseName}_rechazados_sergio_{stamp}_{Guid.NewGuid():N}.partial");
+        try
         {
-            var marker = suffix == 1 ? string.Empty : $"_{suffix}";
-            var finalPath = Path.Combine(rejectedDirectory, $"{baseName}_rechazados_sergio_{stamp}{marker}.csv");
-            var partialPath = finalPath + ".partial";
-            if (File.Exists(finalPath) || File.Exists(partialPath)) continue;
+            using (var stream = new FileStream(partialPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                writePartial(stream);
+            }
 
-            try
+            for (var suffix = 1; ; suffix++)
             {
-                Directory.CreateDirectory(rejectedDirectory);
-                writePartial(partialPath);
-                File.Move(partialPath, finalPath);
-                return finalPath;
+                var marker = suffix == 1 ? string.Empty : $"_{suffix}";
+                var finalPath = Path.Combine(rejectedDirectory, $"{baseName}_rechazados_sergio_{stamp}{marker}.csv");
+                try
+                {
+                    File.Move(partialPath, finalPath);
+                    return finalPath;
+                }
+                catch (IOException) when (File.Exists(finalPath))
+                {
+                    // Another publisher won this candidate. Reuse the completed partial.
+                }
             }
-            catch
-            {
-                DeleteIfExists(partialPath);
-                throw;
-            }
+        }
+        catch
+        {
+            DeleteIfExists(partialPath);
+            throw;
         }
     }
 
@@ -79,10 +89,11 @@ public sealed class SergioRejectedExporter
         countCommand.CommandText = $"SELECT COUNT(*) FROM {table} WHERE {reason} IS NOT NULL";
         var rejectedCount = Convert.ToInt64(countCommand.ExecuteScalar(), CultureInfo.InvariantCulture);
         if (rejectedCount == 0) return new SergioRejectedExportResult(0, null);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        var output = publisher.Publish(workbookPath, clock(), partialPath =>
+        var output = publisher.Publish(workbookPath, clock(), stream =>
         {
-            using var writer = StreamingCsvWriter.OpenNew(partialPath);
+            using var writer = StreamingCsvWriter.Open(stream);
             writer.WriteRow(new[] { "PP_MOTIVO" }.Concat(aliases));
             using var command = connection.CreateCommand();
             command.CommandText = $"SELECT {reason}{(aliases.Length == 0 ? string.Empty : ", " + projection)} FROM {table} WHERE {reason} IS NOT NULL";

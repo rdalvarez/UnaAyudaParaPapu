@@ -1,5 +1,6 @@
 using ClosedXML.Excel;
 using PapaPersonas.V2.Shell;
+using System.Text;
 using Xunit;
 
 namespace PapaPersonas.V2.Tests;
@@ -54,15 +55,51 @@ public sealed class SergioRejectedExporterTests
         analyzer.Cleanup(rejected.CandidateTableName);
     }
 
+    [Fact]
+    public async Task ConcurrentPublishersUseDifferentFinalsWithoutPartials()
+    {
+        using var workspace = new ExportWorkspace();
+        var barrier = new Barrier(2);
+        var timestamp = new DateTime(2026, 9, 27, 12, 30, 45);
+        var publisher = new SergioRejectedFilePublisher();
+
+        var paths = await Task.WhenAll(Enumerable.Range(0, 2).Select(index => Task.Run(() =>
+            publisher.Publish(workspace.WorkbookPath, timestamp, stream =>
+            {
+                barrier.SignalAndWait();
+                using var writer = new StreamWriter(stream, Encoding.UTF8, 1024, leaveOpen: true);
+                writer.Write($"publisher-{index}\r\n");
+                writer.Flush();
+            }))));
+
+        Assert.Equal(2, paths.Distinct(StringComparer.Ordinal).Count());
+        Assert.All(paths, path => Assert.Contains($"publisher-", File.ReadAllText(path)));
+        Assert.Empty(Directory.EnumerateFiles(workspace.RejectedDirectory, "*.partial"));
+    }
+
+    [Fact]
+    public void PublisherFailureCleansItsPartialWithoutCreatingFinal()
+    {
+        using var workspace = new ExportWorkspace();
+        var publisher = new SergioRejectedFilePublisher();
+
+        Assert.Throws<InvalidOperationException>(() => publisher.Publish(workspace.WorkbookPath,
+            new DateTime(2026, 9, 27, 12, 30, 45), _ => throw new InvalidOperationException("writer fault")));
+
+        Assert.False(Directory.Exists(workspace.RejectedDirectory) &&
+            Directory.EnumerateFileSystemEntries(workspace.RejectedDirectory).Any());
+    }
+
     private sealed class ExportWorkspace : IDisposable
     {
         private readonly string directory = Path.Combine(Path.GetTempPath(), "PapaPersonasTests", Guid.NewGuid().ToString("N"));
         public ExportWorkspace() => Directory.CreateDirectory(directory);
         public string DatabasePath => Path.Combine(directory, "test.duckdb");
         public string RejectedDirectory => Path.Combine(directory, "rech");
+        public string WorkbookPath => Path.Combine(directory, "sergio.xlsx");
         public string Workbook(string[] headers, string[][] rows)
         {
-            var path = Path.Combine(directory, "sergio.xlsx");
+            var path = WorkbookPath;
             using var book = new XLWorkbook();
             var sheet = book.AddWorksheet("Sergio");
             for (var c = 0; c < headers.Length; c++) sheet.Cell(1, c + 1).Value = headers[c];
