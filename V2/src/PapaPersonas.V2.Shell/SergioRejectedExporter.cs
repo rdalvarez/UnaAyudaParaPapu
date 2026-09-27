@@ -13,8 +13,25 @@ public interface ISergioRejectedFilePublisher
     string Publish(string workbookPath, DateTime timestamp, Action<Stream> writePartial);
 }
 
+public interface ISergioRejectedFileMover
+{
+    void Move(string sourcePath, string destinationPath);
+}
+
+internal sealed class SergioRejectedFileMover : ISergioRejectedFileMover
+{
+    public void Move(string sourcePath, string destinationPath) => File.Move(sourcePath, destinationPath);
+}
+
 public sealed class SergioRejectedFilePublisher : ISergioRejectedFilePublisher
 {
+    private readonly ISergioRejectedFileMover mover;
+
+    public SergioRejectedFilePublisher(ISergioRejectedFileMover? mover = null)
+    {
+        this.mover = mover ?? new SergioRejectedFileMover();
+    }
+
     public string Publish(string workbookPath, DateTime timestamp, Action<Stream> writePartial)
     {
         var directory = Path.GetDirectoryName(Path.GetFullPath(workbookPath))!;
@@ -22,6 +39,7 @@ public sealed class SergioRejectedFilePublisher : ISergioRejectedFilePublisher
         var baseName = Path.GetFileNameWithoutExtension(workbookPath);
         var stamp = timestamp.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
 
+        var createdRejectedDirectory = !Directory.Exists(rejectedDirectory);
         Directory.CreateDirectory(rejectedDirectory);
         var partialPath = Path.Combine(rejectedDirectory,
             $".{baseName}_rechazados_sergio_{stamp}_{Guid.NewGuid():N}.partial");
@@ -38,10 +56,10 @@ public sealed class SergioRejectedFilePublisher : ISergioRejectedFilePublisher
                 var finalPath = Path.Combine(rejectedDirectory, $"{baseName}_rechazados_sergio_{stamp}{marker}.csv");
                 try
                 {
-                    File.Move(partialPath, finalPath);
+                    mover.Move(partialPath, finalPath);
                     return finalPath;
                 }
-                catch (IOException) when (File.Exists(finalPath))
+                catch (IOException exception) when (IsDestinationCollision(exception))
                 {
                     // Another publisher won this candidate. Reuse the completed partial.
                 }
@@ -50,13 +68,33 @@ public sealed class SergioRejectedFilePublisher : ISergioRejectedFilePublisher
         catch
         {
             DeleteIfExists(partialPath);
+            DeleteEmptyDirectoryIfCreated(rejectedDirectory, createdRejectedDirectory);
             throw;
         }
+    }
+
+    private static bool IsDestinationCollision(IOException exception)
+    {
+        // File.Move reports Win32 ERROR_FILE_EXISTS (80) or ERROR_ALREADY_EXISTS (183)
+        // in the low word of HResult when a non-overwriting destination allocation loses.
+        var win32Error = exception.HResult & 0xFFFF;
+        return win32Error is 80 or 183;
     }
 
     private static void DeleteIfExists(string path)
     {
         if (File.Exists(path)) File.Delete(path);
+    }
+
+    private static void DeleteEmptyDirectoryIfCreated(string path, bool created)
+    {
+        if (!created) return;
+        try
+        {
+            if (!Directory.EnumerateFileSystemEntries(path).Any()) Directory.Delete(path);
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
     }
 }
 

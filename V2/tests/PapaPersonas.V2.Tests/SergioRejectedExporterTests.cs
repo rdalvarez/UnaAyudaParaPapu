@@ -90,6 +90,47 @@ public sealed class SergioRejectedExporterTests
             Directory.EnumerateFileSystemEntries(workspace.RejectedDirectory).Any());
     }
 
+    [Fact]
+    public void NonCollisionIoFailureIsNotRetriedEvenWhenDestinationExists()
+    {
+        using var workspace = new ExportWorkspace();
+        Directory.CreateDirectory(workspace.RejectedDirectory);
+        var destination = Path.Combine(workspace.RejectedDirectory, "sergio_rechazados_sergio_20260927_123045.csv");
+        File.WriteAllText(destination, "existing");
+        var expected = new IOException("access denied", unchecked((int)0x80070005));
+        var publisher = new SergioRejectedFilePublisher(new ThrowingMover(expected));
+
+        var actual = Assert.Throws<IOException>(() => publisher.Publish(workspace.WorkbookPath,
+            new DateTime(2026, 9, 27, 12, 30, 45), stream => new StreamWriter(stream, Encoding.UTF8, 1024, true).Write("data")));
+
+        Assert.Same(expected, actual);
+        Assert.Equal("existing", File.ReadAllText(destination));
+        Assert.Empty(Directory.EnumerateFiles(workspace.RejectedDirectory, "*.partial"));
+    }
+
+    [Fact]
+    public void CancellationCleansPartialOutput()
+    {
+        using var workspace = new ExportWorkspace();
+        using var cancellation = new CancellationTokenSource();
+        var publisher = new SergioRejectedFilePublisher();
+
+        Assert.Throws<OperationCanceledException>(() => publisher.Publish(workspace.WorkbookPath,
+            new DateTime(2026, 9, 27, 12, 30, 45), stream =>
+            {
+                cancellation.Cancel();
+                cancellation.Token.ThrowIfCancellationRequested();
+            }));
+
+        Assert.False(Directory.Exists(workspace.RejectedDirectory) &&
+            Directory.EnumerateFileSystemEntries(workspace.RejectedDirectory).Any());
+    }
+
+    private sealed class ThrowingMover(IOException exception) : ISergioRejectedFileMover
+    {
+        public void Move(string sourcePath, string destinationPath) => throw exception;
+    }
+
     private sealed class ExportWorkspace : IDisposable
     {
         private readonly string directory = Path.Combine(Path.GetTempPath(), "PapaPersonasTests", Guid.NewGuid().ToString("N"));
