@@ -191,6 +191,48 @@ public sealed class SergioStagingTests
     }
 
     [Fact]
+    public void RealMetadataSchemaFailureRollsBackReplacementAndAllowsRetryAfterRepair()
+    {
+        using var workspace = new TestWorkspace();
+        var analyzer = new SergioStagingAnalyzer(new DuckDbPathPolicy(workspace.DatabasePath));
+        var previous = Stage(workspace, analyzer, "old.xlsx", "old");
+        using (var connection = Open(workspace.DatabasePath))
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "CREATE TABLE sergio_current(CUIL VARCHAR); INSERT INTO sergio_current VALUES ('old'); CREATE TABLE sergio_load_metadata(source_file_name VARCHAR); INSERT INTO sergio_load_metadata VALUES ('old.xlsx'); CREATE TABLE unrelated(value VARCHAR); INSERT INTO unrelated VALUES ('untouched');";
+            command.ExecuteNonQuery();
+        }
+
+        var next = Stage(workspace, analyzer, "new.xlsx", "new");
+        var promoter = new SergioLoadPromoter(analyzer);
+
+        Assert.ThrowsAny<Exception>(() => promoter.Promote(next.CandidateTableName, "CUIL", next.Workbook));
+
+        using (var verify = Open(workspace.DatabasePath))
+        {
+            Assert.Equal("old", ReadValue(verify, SergioLoadPromoter.OfficialTableName, "CUIL"));
+            Assert.Equal("old.xlsx", ReadValue(verify, SergioLoadPromoter.MetadataTableName, "source_file_name"));
+            Assert.True(TableExists(verify, next.CandidateTableName));
+            Assert.Equal("untouched", ReadValue(verify, "unrelated"));
+        }
+
+        using (var repair = Open(workspace.DatabasePath))
+        using (var command = repair.CreateCommand())
+        {
+            command.CommandText = "DROP TABLE sergio_load_metadata; CREATE TABLE sergio_load_metadata(source_file_name VARCHAR, loaded_at_utc TIMESTAMP, row_count BIGINT, selected_primary_key_alias VARCHAR, schema_version VARCHAR);";
+            command.ExecuteNonQuery();
+        }
+
+        promoter.Promote(next.CandidateTableName, "CUIL", next.Workbook);
+
+        using var final = Open(workspace.DatabasePath);
+        Assert.Equal("new", ReadValue(final, SergioLoadPromoter.OfficialTableName, "CUIL"));
+        Assert.Equal("new.xlsx", ReadValue(final, SergioLoadPromoter.MetadataTableName, "source_file_name"));
+        Assert.Equal("untouched", ReadValue(final, "unrelated"));
+        Assert.False(TableExists(final, next.CandidateTableName));
+    }
+
+    [Fact]
     public void UnknownCandidateIsRejectedWithoutMutation()
     {
         using var workspace = new TestWorkspace();
