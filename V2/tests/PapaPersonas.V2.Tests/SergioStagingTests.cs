@@ -277,6 +277,8 @@ public sealed class SergioStagingTests
         Assert.True(TableExists(verify, "unrelated"));
         Assert.False(TableExists(verify, first.CandidateTableName));
         Assert.False(TableExists(verify, second.CandidateTableName));
+        Assert.ThrowsAny<Exception>(() => new SergioRejectedExporter(analyzer).Export(first.CandidateTableName, first.Workbook));
+        Assert.Equal("new", ReadValue(verify, SergioLoadPromoter.LastImportTableName, "CUIL"));
     }
 
     [Fact]
@@ -287,6 +289,8 @@ public sealed class SergioStagingTests
         var old = Stage(workspace, analyzer, "old.xlsx", "old");
         var stable = new SergioLoadPromoter(analyzer);
         stable.Promote(old.CandidateTableName, "CUIL", old.Workbook);
+        var previousExport = new SergioRejectedExporter(analyzer).Export(SergioLoadPromoter.LastImportTableName, old.Workbook);
+        Assert.False(previousExport.HasOutput);
         var next = Stage(workspace, analyzer, "new.xlsx", "new");
         var failing = new SergioLoadPromoter(analyzer, () => throw new InvalidOperationException("forced test failure"));
 
@@ -317,9 +321,15 @@ public sealed class SergioStagingTests
 
         using (var verify = Open(workspace.DatabasePath))
         {
-            Assert.Equal("old", ReadValue(verify, SergioLoadPromoter.OfficialTableName, "CUIL"));
-            Assert.Equal("old.xlsx", ReadValue(verify, SergioLoadPromoter.MetadataTableName, "source_file_name"));
-            Assert.True(TableExists(verify, next.CandidateTableName));
+        Assert.Equal("old", ReadValue(verify, SergioLoadPromoter.OfficialTableName, "CUIL"));
+        Assert.Equal("old.xlsx", ReadValue(verify, SergioLoadPromoter.MetadataTableName, "source_file_name"));
+        if (TableExists(verify, SergioLoadPromoter.LastImportTableName))
+            Assert.Equal("old", ReadValue(verify, SergioLoadPromoter.LastImportTableName, "CUIL"));
+        Assert.True(TableExists(verify, next.CandidateTableName));
+        Assert.DoesNotContain(ListTableNames(verify), name => name.StartsWith("sergio_publication_", StringComparison.Ordinal));
+        Assert.DoesNotContain(ListTableNames(verify), name => name.StartsWith("sergio_previous_", StringComparison.Ordinal));
+        var retryableExport = new SergioRejectedExporter(analyzer).Export(next.CandidateTableName, next.Workbook);
+        Assert.False(retryableExport.HasOutput);
             Assert.Equal("untouched", ReadValue(verify, "unrelated"));
         }
 
@@ -396,6 +406,15 @@ public sealed class SergioStagingTests
     private static void Execute(DuckDBConnection connection, string sql) { using var command = connection.CreateCommand(); command.CommandText = sql; command.ExecuteNonQuery(); }
     private static string ReadValue(DuckDBConnection connection, string table, string column = "value") { using var command = connection.CreateCommand(); command.CommandText = $"SELECT \"{column}\" FROM \"{table}\" LIMIT 1"; return (string)command.ExecuteScalar()!; }
     private static string? ReadNullableValue(DuckDBConnection connection, string table, string column) { using var command = connection.CreateCommand(); command.CommandText = $"SELECT \"{column}\" FROM \"{table}\" LIMIT 1"; return command.ExecuteScalar() as string; }
+    private static IReadOnlyList<string> ListTableNames(DuckDBConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT table_name FROM information_schema.tables";
+        using var reader = command.ExecuteReader();
+        var names = new List<string>();
+        while (reader.Read()) names.Add(reader.GetString(0));
+        return names;
+    }
     private static (string CandidateTableName, string Workbook) Stage(TestWorkspace workspace, SergioStagingAnalyzer analyzer, string fileName, string value)
     {
         var workbook = workspace.CreateWorkbook(fileName, ["CUIL"], [[value]]);

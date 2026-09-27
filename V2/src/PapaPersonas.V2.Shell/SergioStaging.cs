@@ -237,13 +237,67 @@ public sealed class SergioStagingAnalyzer
     }
     internal void RetainAsLastImport(string candidateTableName)
     {
+        using var transition = PrepareLastImportTransition(candidateTableName, null);
+        transition.Complete();
+    }
+    internal AnalyzerOwnershipTransition PrepareLastImportTransition(string candidateTableName, string? selectedPrimaryKeyAlias)
+    {
+        if (string.Equals(candidateTableName, SergioLoadPromoter.LastImportTableName, StringComparison.Ordinal))
+            throw new InvalidOperationException("The Sergio candidate cannot already be the canonical last import.");
+
         lock (sync)
         {
-            if (!ownedCandidates.TryGetValue(candidateTableName, out var descriptor))
+            if (!ownedCandidates.TryGetValue(candidateTableName, out var candidate) ||
+                (selectedPrimaryKeyAlias is not null && !string.Equals(candidate.SelectedPrimaryKeyAlias, selectedPrimaryKeyAlias, StringComparison.Ordinal)))
                 throw new InvalidOperationException("The Sergio candidate is no longer owned by this analyzer.");
-            ownedCandidates.Remove(candidateTableName);
-            ownedCandidates.Remove(SergioLoadPromoter.LastImportTableName);
-            ownedCandidates.Add(SergioLoadPromoter.LastImportTableName, descriptor with { IsLastImport = true });
+
+            ownedCandidates.TryGetValue(SergioLoadPromoter.LastImportTableName, out var previousLastImport);
+            // Preparation owns the canonical mapping before Commit. The promotion lock keeps this
+            // invisible to CleanupAll/export while the database transaction is still provisional.
+            var prepared = candidate with { IsLastImport = true };
+            ownedCandidates[SergioLoadPromoter.LastImportTableName] = prepared;
+            return new AnalyzerOwnershipTransition(this, candidateTableName, candidate, previousLastImport);
+        }
+    }
+
+    internal sealed class AnalyzerOwnershipTransition : IDisposable
+    {
+        private readonly SergioStagingAnalyzer analyzer;
+        private readonly string candidateName;
+        private readonly CandidateDescriptor candidate;
+        private readonly CandidateDescriptor? previousLastImport;
+        private bool completed;
+
+        internal AnalyzerOwnershipTransition(SergioStagingAnalyzer analyzer, string candidateName,
+            CandidateDescriptor candidate, CandidateDescriptor? previousLastImport)
+        {
+            this.analyzer = analyzer;
+            this.candidateName = candidateName;
+            this.candidate = candidate;
+            this.previousLastImport = previousLastImport;
+        }
+
+        // Completion is deliberately only dictionary removal: no allocation, validation, or throw
+        // is allowed after the official DuckDB transaction has committed.
+        internal void Complete()
+        {
+            if (completed) return;
+            analyzer.ownedCandidates.Remove(candidateName);
+            completed = true;
+        }
+
+        internal void Rollback()
+        {
+            if (completed) return;
+            analyzer.ownedCandidates[candidateName] = candidate;
+            if (previousLastImport is null) analyzer.ownedCandidates.Remove(SergioLoadPromoter.LastImportTableName);
+            else analyzer.ownedCandidates[SergioLoadPromoter.LastImportTableName] = previousLastImport;
+            completed = true;
+        }
+
+        public void Dispose()
+        {
+            if (!completed) Rollback();
         }
     }
     internal string DatabasePath => pathPolicy.GetDatabasePath();

@@ -72,6 +72,8 @@ public sealed class SergioLoadPromoter
     {
         using var operation = analyzer.AcquirePromotionLock();
         using var connection = Open(analyzer.DatabasePath);
+        EnsureOwnedCandidate(connection, candidateTableName, selectedPrimaryKeyAlias, out _, out _);
+        using var ownership = analyzer.PrepareLastImportTransition(candidateTableName, selectedPrimaryKeyAlias);
         using var transaction = connection.BeginTransaction();
         try
         {
@@ -102,7 +104,9 @@ public sealed class SergioLoadPromoter
             if (oldOfficial is not null) Execute(connection, transaction, $"DROP TABLE {SergioSql.Quote(oldOfficial)}");
             if (oldImport is not null) Execute(connection, transaction, $"DROP TABLE {SergioSql.Quote(oldImport)}");
             transaction.Commit();
-            analyzer.RetainAsLastImport(candidateTableName);
+            // The transaction is now authoritative. This is intentionally the only post-commit
+            // ownership operation and cannot fail or allocate; Dispose must not undo it.
+            ownership.Complete();
         }
         catch { try { transaction.Rollback(); } catch { } throw; }
     }
