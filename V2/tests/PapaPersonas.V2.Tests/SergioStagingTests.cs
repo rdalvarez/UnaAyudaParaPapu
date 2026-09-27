@@ -132,17 +132,95 @@ public sealed class SergioStagingTests
         Assert.True(TableExists(verify, "unrelated"));
     }
 
+    [Fact]
+    public void PreviewIsBoundedAndPreservesVarcharValuesAndNulls()
+    {
+        using var workspace = new TestWorkspace();
+        var workbook = workspace.CreateWorkbook(["CUIL", "Nombre"], Enumerable.Range(1, 25).Select(i => new[] { $"{i}", i == 1 ? null! : $"N{i}" }).ToArray());
+        var analyzer = new SergioStagingAnalyzer(new DuckDbPathPolicy(workspace.DatabasePath));
+        var staged = analyzer.Analyze(new SergioStagingRequest(workbook, SergioHeaderPreflight.Analyze(["CUIL", "Nombre"]), "CUIL"));
+
+        var preview = new SergioLoadPromoter(analyzer).Preview(staged.CandidateTableName, "CUIL", workbook);
+
+        Assert.Equal(25, preview.TotalRows);
+        Assert.Equal(20, preview.Rows.Count);
+        Assert.Equal(["CUIL", "Nombre"], preview.Aliases);
+        Assert.Null(preview.Rows[0][1]);
+        Assert.Equal("sergio.xlsx", preview.SourceFileName);
+        analyzer.Cleanup(staged.CandidateTableName);
+    }
+
+    [Fact]
+    public void PromotionReplacesOfficialAndWritesOneMetadataRow()
+    {
+        using var workspace = new TestWorkspace();
+        using var connection = Open(workspace.DatabasePath);
+        using (var command = connection.CreateCommand()) { command.CommandText = "CREATE TABLE unrelated(value VARCHAR)"; command.ExecuteNonQuery(); }
+        var analyzer = new SergioStagingAnalyzer(new DuckDbPathPolicy(workspace.DatabasePath));
+        var first = Stage(workspace, analyzer, "old.xlsx", "old");
+        var promoter = new SergioLoadPromoter(analyzer);
+        promoter.Promote(first.CandidateTableName, "CUIL", first.Workbook);
+        var second = Stage(workspace, analyzer, "new.xlsx", "new");
+        promoter.Promote(second.CandidateTableName, "CUIL", second.Workbook);
+
+        using var verify = Open(workspace.DatabasePath);
+        Assert.Equal("new", ReadValue(verify, "sergio_current", "CUIL"));
+        Assert.Equal("new.xlsx", ReadValue(verify, "sergio_load_metadata", "source_file_name"));
+        Assert.Equal(1, CountRows(verify, "sergio_load_metadata"));
+        Assert.True(TableExists(verify, "unrelated"));
+        Assert.False(TableExists(verify, first.CandidateTableName));
+        Assert.False(TableExists(verify, second.CandidateTableName));
+    }
+
+    [Fact]
+    public void FailureAfterReplacementRollsBackAndCandidateRemainsRetryable()
+    {
+        using var workspace = new TestWorkspace();
+        var analyzer = new SergioStagingAnalyzer(new DuckDbPathPolicy(workspace.DatabasePath));
+        var old = Stage(workspace, analyzer, "old.xlsx", "old");
+        var stable = new SergioLoadPromoter(analyzer);
+        stable.Promote(old.CandidateTableName, "CUIL", old.Workbook);
+        var next = Stage(workspace, analyzer, "new.xlsx", "new");
+        var failing = new SergioLoadPromoter(analyzer, () => throw new InvalidOperationException("forced test failure"));
+
+        Assert.Throws<InvalidOperationException>(() => failing.Promote(next.CandidateTableName, "CUIL", next.Workbook));
+        using var verify = Open(workspace.DatabasePath);
+        Assert.Equal("old", ReadValue(verify, "sergio_current", "CUIL"));
+        Assert.Equal("old.xlsx", ReadValue(verify, "sergio_load_metadata", "source_file_name"));
+        Assert.True(TableExists(verify, next.CandidateTableName));
+    }
+
+    [Fact]
+    public void UnknownCandidateIsRejectedWithoutMutation()
+    {
+        using var workspace = new TestWorkspace();
+        var analyzer = new SergioStagingAnalyzer(new DuckDbPathPolicy(workspace.DatabasePath));
+        Assert.Throws<InvalidOperationException>(() => new SergioLoadPromoter(analyzer).Preview("sergio_staging_unknown", "CUIL", "C:\\secret\\sergio.xlsx"));
+        using var verify = Open(workspace.DatabasePath);
+        Assert.False(TableExists(verify, "sergio_current"));
+        Assert.False(TableExists(verify, "sergio_load_metadata"));
+    }
+
     private static DuckDBConnection Open(string path) { var connection = new DuckDBConnection(new DuckDBConnectionStringBuilder { DataSource = path }.ConnectionString); connection.Open(); return connection; }
     private static bool TableExists(DuckDBConnection connection, string name) { using var command = connection.CreateCommand(); command.CommandText = "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?"; command.Parameters.Add(new DuckDBParameter { Value = name }); return Convert.ToInt64(command.ExecuteScalar()) > 0; }
+    private static long CountRows(DuckDBConnection connection, string table) { using var command = connection.CreateCommand(); command.CommandText = $"SELECT COUNT(*) FROM \"{table}\""; return Convert.ToInt64(command.ExecuteScalar()); }
+    private static string ReadValue(DuckDBConnection connection, string table, string column = "value") { using var command = connection.CreateCommand(); command.CommandText = $"SELECT \"{column}\" FROM \"{table}\" LIMIT 1"; return (string)command.ExecuteScalar()!; }
+    private static (string CandidateTableName, string Workbook) Stage(TestWorkspace workspace, SergioStagingAnalyzer analyzer, string fileName, string value)
+    {
+        var workbook = workspace.CreateWorkbook(fileName, ["CUIL"], [[value]]);
+        var result = analyzer.Analyze(new SergioStagingRequest(workbook, SergioHeaderPreflight.Analyze(["CUIL"]), "CUIL"));
+        return (result.CandidateTableName, workbook);
+    }
 
     private sealed class TestWorkspace : IDisposable
     {
         private readonly string directory = Path.Combine(Path.GetTempPath(), "PapaPersonasTests", Guid.NewGuid().ToString("N"));
         public string DatabasePath => Path.Combine(directory, "test.duckdb");
         public TestWorkspace() => Directory.CreateDirectory(directory);
-        public string CreateWorkbook(string[] headers, string[][] rows)
+        public string CreateWorkbook(string[] headers, string[][] rows) => CreateWorkbook("sergio.xlsx", headers, rows);
+        public string CreateWorkbook(string fileName, string[] headers, string[][] rows)
         {
-            var path = Path.Combine(directory, "sergio.xlsx");
+            var path = Path.Combine(directory, fileName);
             using var workbook = new XLWorkbook();
             var sheet = workbook.AddWorksheet("Sergio");
             for (var column = 0; column < headers.Length; column++) sheet.Cell(1, column + 1).Value = headers[column];

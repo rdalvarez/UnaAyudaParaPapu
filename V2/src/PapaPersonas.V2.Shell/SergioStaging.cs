@@ -86,6 +86,11 @@ public sealed class SergioStagingAnalyzer
 
     public SergioStagingResult Analyze(SergioStagingRequest request, CancellationToken cancellationToken = default)
     {
+        lock (sync) return AnalyzeCore(request, cancellationToken);
+    }
+
+    private SergioStagingResult AnalyzeCore(SergioStagingRequest request, CancellationToken cancellationToken)
+    {
         ValidateRequest(request);
         CleanupStaleCandidatesOnce();
         var databasePath = pathPolicy.GetDatabasePath();
@@ -162,7 +167,12 @@ public sealed class SergioStagingAnalyzer
 
     public void Cleanup(string candidateTableName)
     {
-        if (!IsOwnedName(candidateTableName)) return;
+        lock (sync) CleanupCore(candidateTableName);
+    }
+
+    private void CleanupCore(string candidateTableName)
+    {
+        if (!ownedCandidates.Contains(candidateTableName)) return;
         try
         {
             using var connection = Open(pathPolicy.GetDatabasePath());
@@ -174,9 +184,22 @@ public sealed class SergioStagingAnalyzer
 
     public void CleanupAll()
     {
-        string[] candidates;
-        lock (sync) candidates = ownedCandidates.ToArray();
-        foreach (var candidate in candidates) Cleanup(candidate);
+        lock (sync)
+        {
+            string[] candidates = ownedCandidates.ToArray();
+            foreach (var candidate in candidates) CleanupCore(candidate);
+        }
+    }
+
+    internal IDisposable AcquirePromotionLock() => new PromotionLock(sync);
+    internal bool OwnsCandidate(string candidateTableName) => ownedCandidates.Contains(candidateTableName);
+    internal void ReleaseCandidate(string candidateTableName) => ownedCandidates.Remove(candidateTableName);
+    internal string DatabasePath => pathPolicy.GetDatabasePath();
+    private sealed class PromotionLock : IDisposable
+    {
+        private readonly object gate;
+        public PromotionLock(object gate) { this.gate = gate; Monitor.Enter(gate); }
+        public void Dispose() => Monitor.Exit(gate);
     }
 
     private string CreateCandidateName()
@@ -269,11 +292,16 @@ public sealed class SergioStagingAnalyzer
         }
         catch (Exception exception) { return exception; }
     }
-    private static string Quote(string identifier) => $"\"{identifier.Replace("\"", "\"\"")}\"";
+    internal static string Quote(string identifier) => SergioSql.Quote(identifier);
     private bool staleCleanupCompleted;
     private static bool IsReservedCandidateName(string name) => name.StartsWith("sergio_staging_", StringComparison.Ordinal) && name.Length == 47 && name[15..].All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
     private bool IsOwnedName(string name)
     {
         lock (sync) return ownedCandidates.Contains(name);
     }
+}
+
+internal static class SergioSql
+{
+    internal static string Quote(string identifier) => $"\"{identifier.Replace("\"", "\"\"")}\"";
 }

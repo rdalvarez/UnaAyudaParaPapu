@@ -26,7 +26,7 @@ Sergio workbooks can contain empty or repeated headers. Persisting those headers
 - Every displayed/SQL candidate alias must be deterministically unique, including collisions with raw headers that already contain suffix-like text.
 - Header analysis must remain lightweight and must not scan workbook rows.
 - TDD mode: off; ordinary focused tests and Release build are required.
-- Delivery strategy: `ask-on-risk`; forecast is below 400 authored changed lines for this work unit.
+- Delivery strategy: `ask-on-risk`; SER-004 exceeded the 400-line forecast and the maintainer selected `stacked-to-main` with two ordered slices. No push or PR creation is authorized.
 
 ## Tasks
 
@@ -60,8 +60,15 @@ Sergio workbooks can contain empty or repeated headers. Persisting those headers
   - Commits: `c764557` (`feat(v2): validate sergio staging load`), `140b319` (`docs(v2): document sergio staging readiness`), and `2464efa` (`fix(v2): honor accepted sergio aliases`).
 
 - [ ] **SER-004 — Preview and atomically promote the valid Sergio candidate**
-  - Status: future work after SER-003 verification and product review.
+  - Route: delegated direct because DuckDB promotion, ownership, WPF preview/confirmation, integration tests, and documentation span multiple non-trivial files.
+  - Delivery: `stacked-to-main`, selected by the maintainer after the cohesive implementation forecast exceeded 400 authored lines. Slice 1 is the independently testable promotion backend; slice 2 is WPF integration and documentation.
+  - Status: ready for slice 1 after SER-003 verification.
   - Scope: show bounded preview and replacement warning, then atomically replace the single official Sergio table and update last-file/load-time metadata. Preserve the previous official execution on any failure.
+  - [x] **SER-004A — Add atomic promotion backend, metadata, preview, and integration tests**
+    - Evidence: `SergioLoadPromoter` previews only analyzer-owned candidates with schema-order aliases, at most 20 rows, VARCHAR/null values, total count, basename-only source metadata, and prior official metadata. Promotion serializes with analyzer operations, revalidates ownership/existence/schema, transactionally drops/renames `sergio_current`, writes the one-row `sergio_load_metadata`, and releases ownership only after commit. Identifier quoting is centralized and metadata values are parameterized; full input paths and row values are not persisted or logged. Integration tests cover bounded preview/null preservation, first load and replacement, rollback after forced post-replacement failure, unknown candidate rejection, unrelated-table preservation, cleanup safety, and candidate retryability. Verification: `dotnet build V2/PapaPersonas.sln -c Release --no-restore`; `dotnet test V2/PapaPersonas.sln -c Release --no-build` (71/71); `git diff --check`; structural readback confirmed transactional rename/metadata, ownership serialization/release, no full paths/PII, and no WPF/V1 changes. Runtime GUI smoke: N/A because this slice has no UI change.
+    - Rollback: revert the backend/test changes and this evidence entry; no official-table migration is required because promotion is transactional.
+    - RDD: disabled/unmanaged.
+  - [ ] **SER-004B — Add WPF preview/confirmation flow and close documentation**
   - Evidence: pending.
 
 ## Progress
