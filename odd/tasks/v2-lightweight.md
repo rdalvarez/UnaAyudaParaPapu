@@ -181,6 +181,29 @@ The current application contains a cumulative master-database workflow that is n
   - Acceptance: adding CSV later does not change cleaning-plan semantics or UI state; Excel and CSV readers produce the same raw ordered header snapshot and row contract.
   - Evidence: pending.
 
+- [x] **V2L-010 — Build cleaning execution preflight**
+  - Route: direct bounded implementation.
+  - Scope: create a pure preflight that deduplicates repeated steps by `(action, column position)` while preserving the first occurrence/order, reports omitted steps, and compares the current raw header sequence against the planning snapshot by count, order, and exact identity. Do not read data rows, create output files, enable generation, or change UI behavior.
+  - Acceptance: same-column/same-action repeats are omitted; different actions on the same column remain; header differences abort preflight with a clear result; no source state mutates.
+  - Checks: focused unit tests, Release build, complete V2 tests, and structural readback.
+  - Rollback boundary: pure execution-preflight model/tests/documentation only.
+  - Evidence:
+    - `dotnet build V2/PapaPersonas.sln -c Release --no-restore`: passed; 0 warnings, 0 errors.
+    - `dotnet test V2/PapaPersonas.sln -c Release --no-build`: passed; 16 passed, 0 failed, 0 skipped.
+    - Structural readback: passed; `CleaningExecutionPreflight` is a pure shell model, compares raw headers with ordinal null-preserving identity, validates positions, deduplicates only `(action, position)`, reports omitted metadata, renumbers an execution copy, and does not mutate the visible plan or snapshots. No UI, file, row, output, generation, Sergio, DuckDB, or V1 code was added.
+    - Rollback boundary: remove `CleaningExecutionPreflight.cs`, its focused tests, and the V2L-010 README/ODD evidence only.
+    - RDD risk: `disabled/unmanaged`.
+    - Commit: `feat(v2): add cleaning execution preflight` (single work-unit commit for this implementation).
+    - Next step: V2L-011 motor temporal, still not implemented.
+
+- [ ] **V2L-011 — Execute cleaning through fixed temporary files**
+  - Status: future implementation task after V2L-010 verification.
+  - Scope: use `%LOCALAPPDATA%\PapaPersonas\V2\temp` as one exclusive workspace, clean stale content before processing, stream input to temporaries, apply each normalized cycle in order, write UTF-8 BOM comma-delimited CSV outputs, and always clean the workspace in `finally`. No DuckDB and no whole-file row materialization.
+  - Output: clean CSV beside the original; one consolidated rejected CSV inside the selected `rech` folder. Both names use the source base name plus timestamp. Rejected metadata columns appear first: `PP_MOTIVO`, `PP_PASO`, `PP_COLUMNA`, `PP_VALOR`, followed by every original column in order.
+  - Duplicate semantics: compare trimmed non-empty values case-insensitively; reject every row in repeated groups. Empty semantics: trim the selected value and reject when empty.
+  - Completion: later UI wiring shows cycle logs and a final custom dialog with `Abrir carpeta` (opens the source folder) and `Aceptar`.
+  - Evidence: pending.
+
 ## Confirmed Future Cleaning Semantics
 
 - Each cleaning cycle operates on one selected column and on the previous cycle's result.
@@ -192,4 +215,4 @@ The current application contains a cumulative master-database workflow that is n
 
 ## Progress and Next Step
 
-`V2L-001` through `V2L-008` are complete and the single-pass speed improvement is manually accepted. Source-format extensibility is documented but intentionally unimplemented. TXT log export and cleaning execution remain future work requiring explicit authorization.
+`V2L-001` through `V2L-008` and V2L-010 are complete and the single-pass speed improvement is manually accepted. V2L-011 performs the later temporary-file execution and remains unimplemented. Source-format extensibility and TXT log export remain future work.

@@ -108,4 +108,98 @@ public sealed class TabCatalogTests
             ["1. Quitar duplicados por CUIT", "2. Quitar valores vacíos por CUIT"],
             plan.Steps.Select(step => step.VisibleDescription));
     }
+
+    [Fact]
+    public void CleaningExecutionPreflightAcceptsIdenticalRawHeaders()
+    {
+        var plan = new CleaningPlan();
+        plan.Add(CleaningAction.RemoveDuplicates, new DetectedColumn(0, "CUIT"));
+
+        var result = CleaningExecutionPreflight.Prepare(["CUIT", null], ["CUIT", null], plan.Steps);
+
+        Assert.True(result.IsValid);
+        Assert.Null(result.FailureReason);
+        Assert.Single(result.ExecutableSteps);
+    }
+
+    [Theory]
+    [InlineData("count")]
+    [InlineData("order")]
+    [InlineData("value")]
+    public void CleaningExecutionPreflightRejectsHeaderChanges(string change)
+    {
+        var planning = new string?[] { "CUIT", "Name" };
+        var current = change switch
+        {
+            "count" => new string?[] { "CUIT" },
+            "order" => new string?[] { "Name", "CUIT" },
+            "value" => new string?[] { "CUIT", "NAME" },
+            _ => throw new ArgumentOutOfRangeException(nameof(change))
+        };
+
+        var result = CleaningExecutionPreflight.Prepare(planning, current, []);
+
+        Assert.False(result.IsValid);
+        Assert.NotNull(result.FailureReason);
+        Assert.Empty(result.ExecutableSteps);
+    }
+
+    [Fact]
+    public void CleaningExecutionPreflightTreatsNullAndValueAsDifferentHeaders()
+    {
+        var result = CleaningExecutionPreflight.Prepare([null], [""], []);
+
+        Assert.False(result.IsValid);
+        Assert.Contains("<null>", result.FailureReason);
+    }
+
+    [Fact]
+    public void CleaningExecutionPreflightDeduplicatesOnlyTheSameActionAndPosition()
+    {
+        var plan = new CleaningPlan();
+        var column = new DetectedColumn(2, "CUIT");
+        plan.Add(CleaningAction.RemoveDuplicates, column);
+        plan.Add(CleaningAction.RemoveDuplicates, column);
+        plan.Add(CleaningAction.RemoveEmptyValues, column);
+
+        var result = CleaningExecutionPreflight.Prepare(["A", "B", "CUIT"], ["A", "B", "CUIT"], plan.Steps);
+
+        Assert.True(result.IsValid);
+        Assert.Equal(
+            [CleaningAction.RemoveDuplicates, CleaningAction.RemoveEmptyValues],
+            result.ExecutableSteps.Select(step => step.Action));
+        Assert.Equal([1, 2], result.ExecutableSteps.Select(step => step.StepNumber));
+        var omitted = Assert.Single(result.OmittedSteps);
+        Assert.Equal(2, omitted.Step.StepNumber);
+        Assert.Contains("Repeated", omitted.Reason);
+    }
+
+    [Fact]
+    public void CleaningExecutionPreflightRejectsOutOfRangeColumnPosition()
+    {
+        var steps = new[] { new CleaningPlanStep(CleaningAction.RemoveDuplicates, 2, "Missing", 1) };
+
+        var result = CleaningExecutionPreflight.Prepare(["CUIT", "Name"], ["CUIT", "Name"], steps);
+
+        Assert.False(result.IsValid);
+        Assert.Contains("position 2", result.FailureReason);
+        Assert.Empty(result.ExecutableSteps);
+    }
+
+    [Fact]
+    public void CleaningExecutionPreflightDoesNotMutateInputs()
+    {
+        var planning = new List<string?> { "CUIT", null };
+        var current = new List<string?> { "CUIT", null };
+        var plan = new CleaningPlan();
+        plan.Add(CleaningAction.RemoveDuplicates, new DetectedColumn(0, "CUIT"));
+        plan.Add(CleaningAction.RemoveDuplicates, new DetectedColumn(0, "CUIT"));
+        var originalSteps = plan.Steps.ToArray();
+
+        _ = CleaningExecutionPreflight.Prepare(planning, current, plan.Steps);
+
+        Assert.Equal(["CUIT", null], planning);
+        Assert.Equal(["CUIT", null], current);
+        Assert.Equal(originalSteps, plan.Steps);
+    }
 }

@@ -16,8 +16,8 @@ dotnet test V2/PapaPersonas.sln -c Release --no-build
 
 Header discovery configures ExcelDataReader 3.9.0 with `SinglePassMode = true`, then calls `Read()` once and reads the observed `FieldCount` values in their original order and positions. `RowCount` is not used. The same workbook should be compared manually by the user for timing; this change records no invented before/after measurement.
 
-Before future cleaning execution, headers must be re-read and compared with the planning snapshot. That safeguard is documented future behavior and is not implemented here.
+The pure cleaning execution preflight now compares the re-read raw headers with the planning snapshot, validates column positions, and creates a deduplicated executable copy without mutating the visible plan. It is not connected to execution yet; no rows are read and no output is generated.
 
 ## Next step
 
-The next step is for the user to compare speed manually with the same workbook. Do not execute cleaning yet.
+The next step is V2L-011: execute cleaning through fixed temporary files. It is not implemented yet. Do not execute cleaning yet.
