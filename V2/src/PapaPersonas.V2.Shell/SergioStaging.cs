@@ -183,7 +183,7 @@ public sealed class SergioStagingAnalyzer
 
     private void CleanupCore(string candidateTableName)
     {
-        if (!ownedCandidates.ContainsKey(candidateTableName)) return;
+        if (!ownedCandidates.TryGetValue(candidateTableName, out var descriptor) || descriptor.IsLastImport) return;
         try
         {
             using var connection = Open(pathPolicy.GetDatabasePath());
@@ -220,13 +220,34 @@ public sealed class SergioStagingAnalyzer
             return descriptor;
         }
     }
+    internal CandidateDescriptor GetOwnedCandidateForKey(string candidateTableName, string selectedPrimaryKeyAlias)
+    {
+        lock (sync)
+        {
+            if (!ownedCandidates.TryGetValue(candidateTableName, out var descriptor) ||
+                !string.Equals(descriptor.SelectedPrimaryKeyAlias, selectedPrimaryKeyAlias, StringComparison.Ordinal))
+                throw new InvalidOperationException("The Sergio candidate is unknown or was staged with a different primary key.");
+            return descriptor;
+        }
+    }
 
     internal void ReleaseCandidate(string candidateTableName)
     {
         lock (sync) ownedCandidates.Remove(candidateTableName);
     }
+    internal void RetainAsLastImport(string candidateTableName)
+    {
+        lock (sync)
+        {
+            if (!ownedCandidates.TryGetValue(candidateTableName, out var descriptor))
+                throw new InvalidOperationException("The Sergio candidate is no longer owned by this analyzer.");
+            ownedCandidates.Remove(candidateTableName);
+            ownedCandidates.Remove(SergioLoadPromoter.LastImportTableName);
+            ownedCandidates.Add(SergioLoadPromoter.LastImportTableName, descriptor with { IsLastImport = true });
+        }
+    }
     internal string DatabasePath => pathPolicy.GetDatabasePath();
-    internal sealed record CandidateDescriptor(string WorkbookPath, IReadOnlyList<string> AcceptedAliases, string SelectedPrimaryKeyAlias, string ReasonColumn);
+    internal sealed record CandidateDescriptor(string WorkbookPath, IReadOnlyList<string> AcceptedAliases, string SelectedPrimaryKeyAlias, string ReasonColumn, bool IsLastImport = false);
     private sealed class PromotionLock : IDisposable
     {
         private readonly object gate;

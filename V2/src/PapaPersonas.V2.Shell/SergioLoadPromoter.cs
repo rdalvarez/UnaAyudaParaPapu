@@ -9,7 +9,19 @@ public sealed record SergioPreview(
     string SelectedPrimaryKeyAlias,
     string SourceFileName,
     bool PreviousOfficialExists,
-    SergioLoadMetadata? PreviousMetadata);
+    SergioLoadMetadata? PreviousMetadata,
+    long ValidRows = 0)
+{
+    public long ImportedRows => TotalRows;
+    public long RejectedRows => TotalRows - ValidRows;
+}
+
+public static class SergioPreviewExtensions
+{
+    public static long ImportedRows(this SergioPreview preview) => preview.ImportedRows;
+    public static long ValidRows(this SergioPreview preview) => preview.ValidRows;
+    public static long RejectedRows(this SergioPreview preview) => preview.RejectedRows;
+}
 
 public sealed record SergioLoadMetadata(
     string SourceFileName,
@@ -22,6 +34,7 @@ public sealed class SergioLoadPromoter
 {
     public const string OfficialTableName = "sergio_current";
     public const string MetadataTableName = "sergio_load_metadata";
+    public const string LastImportTableName = "sergio_last_import";
     private readonly SergioStagingAnalyzer analyzer;
     private readonly Action? afterOfficialReplacement;
 
@@ -35,12 +48,12 @@ public sealed class SergioLoadPromoter
     {
         using var operation = analyzer.AcquirePromotionLock();
         using var connection = Open(analyzer.DatabasePath);
-        EnsureOwnedCandidate(connection, candidateTableName, selectedPrimaryKeyAlias, out var aliases);
+        EnsureOwnedCandidate(connection, candidateTableName, selectedPrimaryKeyAlias, out var aliases, out var validRows);
         var rows = new List<IReadOnlyList<string?>>();
         var businessProjection = string.Join(", ", aliases.Select(SergioSql.Quote));
         using (var command = connection.CreateCommand())
         {
-            command.CommandText = $"SELECT {businessProjection} FROM {SergioSql.Quote(candidateTableName)} LIMIT 20";
+            command.CommandText = $"SELECT {businessProjection} FROM {SergioSql.Quote(candidateTableName)} WHERE {SergioSql.Quote(SergioSchemaNames.RejectionReason)} IS NULL LIMIT 20";
             using var reader = command.ExecuteReader();
             while (reader.Read())
             {
@@ -52,7 +65,7 @@ public sealed class SergioLoadPromoter
         var total = Scalar(connection, $"SELECT COUNT(*) FROM {SergioSql.Quote(candidateTableName)}");
         var metadata = ReadMetadata(connection);
         return new SergioPreview(aliases, rows, total, selectedPrimaryKeyAlias, Path.GetFileName(sourceFilePath),
-            TableExists(connection, OfficialTableName), metadata);
+            TableExists(connection, OfficialTableName), metadata, validRows);
     }
 
     public void Promote(string candidateTableName, string selectedPrimaryKeyAlias, string sourceFilePath, string? schemaVersion = null)
@@ -62,12 +75,18 @@ public sealed class SergioLoadPromoter
         using var transaction = connection.BeginTransaction();
         try
         {
-            EnsureOwnedCandidate(connection, candidateTableName, selectedPrimaryKeyAlias, out var aliases, transaction);
-            if (TableExists(connection, OfficialTableName, transaction))
-                Execute(connection, transaction, $"DROP TABLE {SergioSql.Quote(OfficialTableName)}");
+            EnsureOwnedCandidate(connection, candidateTableName, selectedPrimaryKeyAlias, out var aliases, out var validRows, transaction);
+            var publication = $"sergio_publication_{Guid.NewGuid():N}";
+            var columns = string.Join(", ", aliases.Select(alias => $"{SergioSql.Quote(alias)} VARCHAR"));
+            Execute(connection, transaction, $"CREATE TABLE {SergioSql.Quote(publication)} ({columns}, PRIMARY KEY ({SergioSql.Quote(selectedPrimaryKeyAlias)}))");
             var businessProjection = string.Join(", ", aliases.Select(SergioSql.Quote));
-            Execute(connection, transaction, $"CREATE TABLE {SergioSql.Quote(OfficialTableName)} AS SELECT {businessProjection} FROM {SergioSql.Quote(candidateTableName)}");
-            Execute(connection, transaction, $"DROP TABLE {SergioSql.Quote(candidateTableName)}");
+            Execute(connection, transaction, $"INSERT INTO {SergioSql.Quote(publication)} ({businessProjection}) SELECT {businessProjection} FROM {SergioSql.Quote(candidateTableName)} WHERE {SergioSql.Quote(SergioSchemaNames.RejectionReason)} IS NULL");
+            if (Scalar(connection, $"SELECT COUNT(*) FROM {SergioSql.Quote(publication)}", transaction) != validRows)
+                throw new InvalidOperationException("The Sergio publication row count does not match the validated candidate.");
+            var oldOfficial = RenameAside(connection, transaction, OfficialTableName, "official");
+            Execute(connection, transaction, $"ALTER TABLE {SergioSql.Quote(publication)} RENAME TO {SergioSql.Quote(OfficialTableName)}");
+            var oldImport = RenameAside(connection, transaction, LastImportTableName, "import");
+            Execute(connection, transaction, $"ALTER TABLE {SergioSql.Quote(candidateTableName)} RENAME TO {SergioSql.Quote(LastImportTableName)}");
             afterOfficialReplacement?.Invoke();
             Execute(connection, transaction, $"CREATE TABLE IF NOT EXISTS {SergioSql.Quote(MetadataTableName)} (source_file_name VARCHAR, loaded_at_utc TIMESTAMP, row_count BIGINT, selected_primary_key_alias VARCHAR, schema_version VARCHAR)");
             Execute(connection, transaction, $"DELETE FROM {SergioSql.Quote(MetadataTableName)}");
@@ -76,29 +95,43 @@ public sealed class SergioLoadPromoter
             insert.CommandText = $"INSERT INTO {SergioSql.Quote(MetadataTableName)} VALUES (?, ?, ?, ?, ?)";
             insert.Parameters.Add(new DuckDBParameter { Value = Path.GetFileName(sourceFilePath) });
             insert.Parameters.Add(new DuckDBParameter { Value = DateTime.UtcNow });
-            insert.Parameters.Add(new DuckDBParameter { Value = Scalar(connection, $"SELECT COUNT(*) FROM {SergioSql.Quote(OfficialTableName)}", transaction) });
+            insert.Parameters.Add(new DuckDBParameter { Value = validRows });
             insert.Parameters.Add(new DuckDBParameter { Value = selectedPrimaryKeyAlias });
             insert.Parameters.Add(new DuckDBParameter { Value = (object?)schemaVersion ?? DBNull.Value });
             insert.ExecuteNonQuery();
+            if (oldOfficial is not null) Execute(connection, transaction, $"DROP TABLE {SergioSql.Quote(oldOfficial)}");
+            if (oldImport is not null) Execute(connection, transaction, $"DROP TABLE {SergioSql.Quote(oldImport)}");
             transaction.Commit();
-            analyzer.ReleaseCandidate(candidateTableName);
+            analyzer.RetainAsLastImport(candidateTableName);
         }
         catch { try { transaction.Rollback(); } catch { } throw; }
     }
 
-    private void EnsureOwnedCandidate(DuckDBConnection connection, string candidate, string key, out IReadOnlyList<string> aliases, DuckDBTransaction? transaction = null)
+    private void EnsureOwnedCandidate(DuckDBConnection connection, string candidate, string key, out IReadOnlyList<string> aliases, out long validRows, DuckDBTransaction? transaction = null)
     {
         if (!analyzer.OwnsCandidate(candidate, key) || !TableExists(connection, candidate, transaction))
             throw new InvalidOperationException("The Sergio candidate is unknown, not owned by this analyzer, or was staged with a different primary key.");
+        var descriptor = analyzer.GetOwnedCandidateForKey(candidate, key);
         aliases = ReadColumns(connection, candidate, transaction);
+        var expectedColumns = descriptor.AcceptedAliases.Contains(descriptor.ReasonColumn, StringComparer.Ordinal)
+            ? descriptor.AcceptedAliases
+            : descriptor.AcceptedAliases.Append(descriptor.ReasonColumn).ToArray();
+        if (!aliases.SequenceEqual(expectedColumns, StringComparer.Ordinal))
+            throw new InvalidOperationException("The Sergio candidate schema no longer matches its analyzer-owned descriptor.");
         if (!aliases.Contains(key, StringComparer.Ordinal)) throw new InvalidOperationException("The selected Sergio primary key is not in the candidate schema.");
         var technical = aliases.FirstOrDefault(alias => string.Equals(alias, SergioSchemaNames.RejectionReason, StringComparison.Ordinal));
         if (technical is null) throw new InvalidOperationException("The Sergio candidate has no rejection classification column.");
-        if (Scalar(connection, $"SELECT COUNT(*) FROM {SergioSql.Quote(candidate)}", transaction) == 0)
-            throw new InvalidOperationException("The Sergio candidate contains no rows and cannot be promoted.");
-        if (Scalar(connection, $"SELECT COUNT(*) FROM {SergioSql.Quote(candidate)} WHERE {SergioSql.Quote(technical)} IS NOT NULL", transaction) != 0)
-            throw new InvalidOperationException("The Sergio candidate contains rejected rows and cannot be promoted.");
+        validRows = Scalar(connection, $"SELECT COUNT(*) FROM {SergioSql.Quote(candidate)} WHERE {SergioSql.Quote(technical)} IS NULL", transaction);
+        if (validRows == 0) throw new InvalidOperationException("The Sergio candidate contains no valid rows and cannot be promoted.");
         aliases = aliases.Where(alias => !string.Equals(alias, SergioSchemaNames.RejectionReason, StringComparison.Ordinal)).ToArray();
+    }
+
+    private static string? RenameAside(DuckDBConnection connection, DuckDBTransaction transaction, string table, string kind)
+    {
+        if (!TableExists(connection, table, transaction)) return null;
+        var backup = $"sergio_previous_{kind}_{Guid.NewGuid():N}";
+        Execute(connection, transaction, $"ALTER TABLE {SergioSql.Quote(table)} RENAME TO {SergioSql.Quote(backup)}");
+        return backup;
     }
 
     private static IReadOnlyList<string> ReadColumns(DuckDBConnection c, string table, DuckDBTransaction? tx)

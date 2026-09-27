@@ -216,6 +216,48 @@ public sealed class SergioStagingTests
     }
 
     [Fact]
+    public void MixedPreviewAndPromotionKeepRejectedRowsOnlyInLastImportWithRealPrimaryKey()
+    {
+        using var workspace = new TestWorkspace();
+        var workbook = workspace.CreateWorkbook(["CUIL", "Nombre"], [["20-1", "Ana"], ["20-1", "Beto"], ["20-2", "Ok"], ["", "Empty"]]);
+        var analyzer = new SergioStagingAnalyzer(new DuckDbPathPolicy(workspace.DatabasePath));
+        var staged = analyzer.Analyze(new SergioStagingRequest(workbook, SergioHeaderPreflight.Analyze(["CUIL", "Nombre"]), "CUIL"));
+        var promoter = new SergioLoadPromoter(analyzer);
+
+        var preview = promoter.Preview(staged.CandidateTableName, "CUIL", workbook);
+        Assert.Equal(4, preview.ImportedRows);
+        Assert.Equal(1, preview.ValidRows);
+        Assert.Equal(3, preview.RejectedRows);
+        Assert.Equal("20-2", preview.Rows.Single()[0]);
+        promoter.Promote(staged.CandidateTableName, "CUIL", workbook);
+
+        using var connection = Open(workspace.DatabasePath);
+        Assert.Equal(1, CountRows(connection, SergioLoadPromoter.OfficialTableName));
+        Assert.Equal(4, CountRows(connection, SergioLoadPromoter.LastImportTableName));
+        Assert.Equal(0, CountColumns(connection, SergioLoadPromoter.OfficialTableName, SergioSchemaNames.RejectionReason));
+        Assert.Equal(1, CountPrimaryKeys(connection, SergioLoadPromoter.OfficialTableName, "CUIL"));
+        Assert.ThrowsAny<Exception>(() => Execute(connection, "INSERT INTO sergio_current VALUES ('20-2', 'Again')"));
+        Assert.ThrowsAny<Exception>(() => Execute(connection, "INSERT INTO sergio_current VALUES (NULL, 'Null')"));
+        analyzer.CleanupAll();
+        Assert.True(TableExists(connection, SergioLoadPromoter.OfficialTableName));
+        Assert.True(TableExists(connection, SergioLoadPromoter.LastImportTableName));
+    }
+
+    [Fact]
+    public void ExporterCanUseRetainedLastImportAfterPromotion()
+    {
+        using var workspace = new TestWorkspace();
+        var workbook = workspace.CreateWorkbook(["CUIL"], [["20-1"], ["20-1"], ["20-2"]]);
+        var analyzer = new SergioStagingAnalyzer(new DuckDbPathPolicy(workspace.DatabasePath));
+        var staged = analyzer.Analyze(new SergioStagingRequest(workbook, SergioHeaderPreflight.Analyze(["CUIL"]), "CUIL"));
+        new SergioLoadPromoter(analyzer).Promote(staged.CandidateTableName, "CUIL", workbook);
+
+        var result = new SergioRejectedExporter(analyzer).Export(SergioLoadPromoter.LastImportTableName, workbook);
+        Assert.Equal(2, result.RejectedCount);
+        Assert.Contains("CLAVE_DUPLICADA", File.ReadAllText(result.OutputPath!));
+    }
+
+    [Fact]
     public void PromotionReplacesOfficialAndWritesOneMetadataRow()
     {
         using var workspace = new TestWorkspace();
@@ -350,6 +392,8 @@ public sealed class SergioStagingTests
     private static long CountRows(DuckDBConnection connection, string table) { using var command = connection.CreateCommand(); command.CommandText = $"SELECT COUNT(*) FROM \"{table}\""; return Convert.ToInt64(command.ExecuteScalar()); }
     private static long CountReason(DuckDBConnection connection, string table, string column, string reason) { using var command = connection.CreateCommand(); command.CommandText = $"SELECT COUNT(*) FROM \"{table}\" WHERE \"{column}\" = ?"; command.Parameters.Add(new DuckDBParameter { Value = reason }); return Convert.ToInt64(command.ExecuteScalar()); }
     private static long CountColumns(DuckDBConnection connection, string table, string column) { using var command = connection.CreateCommand(); command.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = ? AND column_name = ?"; command.Parameters.Add(new DuckDBParameter { Value = table }); command.Parameters.Add(new DuckDBParameter { Value = column }); return Convert.ToInt64(command.ExecuteScalar()); }
+    private static long CountPrimaryKeys(DuckDBConnection connection, string table, string column) { using var command = connection.CreateCommand(); command.CommandText = "SELECT COUNT(*) FROM information_schema.table_constraints tc JOIN information_schema.key_column_usage ku ON tc.constraint_name = ku.constraint_name AND tc.table_name = ku.table_name WHERE tc.table_name = ? AND tc.constraint_type = 'PRIMARY KEY' AND ku.column_name = ?"; command.Parameters.Add(new DuckDBParameter { Value = table }); command.Parameters.Add(new DuckDBParameter { Value = column }); return Convert.ToInt64(command.ExecuteScalar()); }
+    private static void Execute(DuckDBConnection connection, string sql) { using var command = connection.CreateCommand(); command.CommandText = sql; command.ExecuteNonQuery(); }
     private static string ReadValue(DuckDBConnection connection, string table, string column = "value") { using var command = connection.CreateCommand(); command.CommandText = $"SELECT \"{column}\" FROM \"{table}\" LIMIT 1"; return (string)command.ExecuteScalar()!; }
     private static string? ReadNullableValue(DuckDBConnection connection, string table, string column) { using var command = connection.CreateCommand(); command.CommandText = $"SELECT \"{column}\" FROM \"{table}\" LIMIT 1"; return command.ExecuteScalar() as string; }
     private static (string CandidateTableName, string Workbook) Stage(TestWorkspace workspace, SergioStagingAnalyzer analyzer, string fileName, string value)
