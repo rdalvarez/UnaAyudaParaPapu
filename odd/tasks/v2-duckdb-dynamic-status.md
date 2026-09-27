@@ -38,7 +38,7 @@ V2 currently creates DuckDB only when a Sergio workbook is analyzed, while the f
   - Checks: temporary-directory integration tests cover first initialization, idempotency, complete metadata, partial canonical state, count mismatch, transient candidates, corrupt input, reset backup, reset collision, and reset rollback. Release build, full V2 tests, and `git diff --check` pass.
   - Rollback: revert only the lifecycle service, its focused tests, and this task evidence; existing Sergio tables remain untouched.
 
-- [ ] **DDS-002 — Integrate dynamic status and reset into the WPF footer**
+- [x] **DDS-002 — Integrate dynamic status and reset into the WPF footer**
   - Route: delegated direct because WPF async lifecycle, stale-update protection, operation-state coordination, presentation tests, and documentation span multiple non-trivial files.
   - Acceptance: startup shows initializing then the observed DuckDB state; the footer reports safe metadata after a successful promotion; failures remain actionable; reset is disabled during Sergio work, asks for confirmation, refreshes status after completion, and never claims success after a failed reset; the old static tab-connection claim is removed.
   - Checks: presentation/state tests cover every status and safe source-name formatting; structural readback confirms one startup hook and no fire-and-forget exception leaks. Release build, full V2 tests, and `git diff --check` pass.
@@ -50,9 +50,19 @@ Feature authorized. Exploration confirmed that V2 has no startup database bootst
 
 DDS-001 implemented in `feat/v2-lightweight` with a dedicated lifecycle backend service and focused integration tests. Metadata initialization is idempotent, inspection reports ready/loaded/inconsistent/unavailable states without mutating business tables, and reset requires explicit confirmation while preserving collision-safe backups and rollback restoration on initialization failure.
 
+DDS-002 implemented by wiring asynchronous lifecycle initialization/inspection into WPF startup, replacing the static footer text with a compact dynamic DuckDB status area, adding guarded reset confirmation/action, and refreshing footer state after Sergio promotion completion (success and failure) and after reset.
+
 ## Evidence
 
 - Focused lifecycle tests: `dotnet test V2/tests/PapaPersonas.V2.Tests/PapaPersonas.V2.Tests.csproj -c Release --filter "FullyQualifiedName~SergioDuckDbLifecycleTests"` → Passed (`Total: 13, Failed: 0`).
 - Full V2 test suite: `dotnet test V2/PapaPersonas.sln -c Release --no-build` → Passed (`Total: 104, Failed: 0`).
 - V2 Release build: first run failed due to locked `PapaPersonas.V2.Shell.dll` by running process `PapaPersonas.V2.App (39260)`; after stopping that process, `dotnet build V2/PapaPersonas.sln -c Release --no-restore` → Passed (`0 errors`).
 - Diff whitespace check: `git diff --check` → Passed (line-ending warning only, no whitespace errors).
+- Focused footer presentation tests: `dotnet test V2/tests/PapaPersonas.V2.Tests/PapaPersonas.V2.Tests.csproj -c Release --filter "FullyQualifiedName~SergioDuckDbFooterPresenterTests"` → Passed (`Total: 7, Failed: 0`).
+- Full V2 test suite: `dotnet test V2/PapaPersonas.sln -c Release --no-build` → Passed (`Total: 111, Failed: 0`).
+- V2 Release build: `dotnet build V2/PapaPersonas.sln -c Release --no-restore` → Passed (`0 errors`).
+- Diff whitespace check: `git diff --check` → Passed (line-ending warnings only, no whitespace errors).
+
+## Forecast update
+
+Original forecast (<400 authored lines) is exceeded across DDS-001 + DDS-002 combined. The work was kept as two cohesive ODD work-unit commits instead of code-golfing or omitting tests.

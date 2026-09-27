@@ -4,6 +4,8 @@ V2 now connects **Preparar archivo de Hernán** end to end. The Sergio tab perfo
 
 **Exportar rechazados** writes `PP_MOTIVO` followed by source columns to the sibling `rech` directory, asynchronously, and logs only count and full path. **Vista previa y cargar** shows only valid rows and states imported, valid-to-load, rejected-excluded, and PK values before **Cargar**/**Reemplazar**. Promotion atomically replaces `sergio_current`, stores valid-row count in metadata, and retains the complete import as `sergio_last_import` so rejected export remains available. Failures retain a retryable candidate. Storage is `%LOCALAPPDATA%\PapaPersonas\V2\papapersonas-v2.duckdb`.
 
+The footer now reports dynamic DuckDB lifecycle status: initializing, ready without official Sergio load, ready with official load (safe source filename + official row count), inconsistent, and unavailable. `Reiniciar base` requires explicit confirmation, moves the current DB to a dated backup, and initializes a fresh DB without official Sergio load. Reset is disabled while any operation or status refresh is busy.
+
 ## Verification
 
 From the repository root:
@@ -24,4 +26,4 @@ V2L-011 adds reusable fixed-workspace and streaming CSV infrastructure. The prod
 
 ## Current verification boundary
 
-SRJ-004 verification uses focused state/text tests, full Release tests, a Release build without restore, diff check, and structural readback. GUI smoke is N/A because no safe representative workbook was available; no automatic file open or process launch is used. TXT export and CSV/TXT input remain future work.
+DDS-002 verification uses focused footer presentation tests, full Release tests, a Release build without restore, and diff check. WPF runtime smoke is N/A in automated checks because this work unit verifies state mapping and async wiring through tests/build only; no deterministic GUI harness is available in CI-like execution here.

@@ -128,7 +128,18 @@
         </GroupBox>
 
         <Border Grid.Row="6" Padding="8" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFF9F9F9">
-             <TextBlock Text="La limpieza de la Solapa 1 y la carga de Sergio están conectadas. La carga de Sergio clasifica filas, permite revisar válidas y rechazadas, y publica la información válida en DuckDB; TXT, Stock y Consultas permanecen fuera de alcance." TextWrapping="Wrap" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock x:Name="DuckDbStatusHeadlineTextBlock" FontWeight="SemiBold" Text="Base local: inicializando DuckDB..." TextWrapping="Wrap" />
+                    <TextBlock x:Name="DuckDbStatusDetailTextBlock" Margin="0,2,0,0" Foreground="#FF666666" Text="Se está validando la base local y su estado de Sergio." TextWrapping="Wrap" />
+                    <TextBlock x:Name="DuckDbPathTextBlock" Margin="0,4,0,0" Foreground="#FF666666" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="" AutomationProperties.Name="Ruta DuckDB" />
+                </StackPanel>
+                <Button x:Name="DuckDbResetButton" Grid.Column="1" Margin="12,0,0,0" MinWidth="120" Height="30" VerticalAlignment="Top" Content="Reiniciar base" Click="DuckDbResetButton_OnClick" />
+            </Grid>
         </Border>
     </Grid>
 </Window>
