@@ -26,4 +26,11 @@ public static class SergioInteractionPolicy
         result.TotalRows - result.ValidRows);
 
     public static bool ContinueAutomatically(SergioStagingPresentation presentation) => !presentation.DecisionRequired;
+
+    public static string RejectionDecisionMessage(SergioStagingPresentation presentation) =>
+        $"Clave primaria seleccionada: {presentation.SelectedPrimaryKey}. " +
+        $"Importadas: {presentation.ImportedRows}. Válidas: {presentation.ValidRows}. " +
+        $"Filas con clave vacía: {presentation.EmptyRows}. Grupos duplicados: {presentation.DuplicateGroups}. " +
+        $"Filas duplicadas: {presentation.DuplicateRows}. Total rechazadas: {presentation.RejectedRows}. " +
+        $"Todas las filas rechazadas serán excluidas. ¿Desea continuar?";
 }

@@ -8,7 +8,7 @@ public partial class SergioRejectionDecisionDialog : Window
     public SergioRejectionDecisionDialog(SergioStagingPresentation presentation)
     {
         InitializeComponent();
-        MessageTextBlock.Text = $"Se excluirán las {presentation.RejectedRows} filas rechazadas. Se podrán cargar únicamente las {presentation.ValidRows} filas válidas. ¿Desea continuar?";
+        MessageTextBlock.Text = SergioInteractionPolicy.RejectionDecisionMessage(presentation);
     }
 
     public bool Accepted { get; private set; }

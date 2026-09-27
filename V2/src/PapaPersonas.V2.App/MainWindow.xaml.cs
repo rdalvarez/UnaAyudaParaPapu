@@ -30,6 +30,7 @@ public partial class MainWindow : Window
     private readonly SergioLoadPromoter _sergioLoadPromoter;
     private readonly SergioRejectedExporter _sergioRejectedExporter;
     private string? _sergioCandidateTable;
+    private string? _sergioExportSourceTable;
     private SergioStagingResult? _sergioStagingResult;
     private bool _sergioRejectionContinuationAccepted;
 
@@ -132,8 +133,7 @@ public partial class MainWindow : Window
         try
         {
             CleanupSergioCandidate();
-            _sergioStagingResult = null;
-            _sergioRejectionContinuationAccepted = false;
+            InvalidateSergioInteractiveState();
             SetBusy(true, "Leyendo encabezados de Sergio...");
             var rawHeaders = await Task.Run(() => _headerReader.ReadHeaders(path).ToArray());
             var result = SergioHeaderPreflight.Analyze(rawHeaders);
@@ -184,8 +184,7 @@ public partial class MainWindow : Window
     private void ClearAcceptedSergioState()
     {
         CleanupSergioCandidate();
-        _sergioStagingResult = null;
-        _sergioRejectionContinuationAccepted = false;
+        InvalidateSergioInteractiveState();
         _acceptedSergioFilePath = null;
         _acceptedSergioHeaders = null;
         SergioFileTextBox.Clear();
@@ -254,7 +253,7 @@ public partial class MainWindow : Window
         SergioPrimaryKeyComboBox.IsEnabled = !isBusy && _acceptedSergioHeaders is not null;
         SergioValidateButton.IsEnabled = !isBusy && _acceptedSergioHeaders is not null && SergioPrimaryKeyComboBox.SelectedItem is string;
         SergioPreviewButton.IsEnabled = !isBusy && _sergioCandidateTable is not null && (_sergioStagingResult?.ValidRows ?? 0) > 0;
-        SergioExportRejectedButton.IsEnabled = !isBusy && _sergioStagingResult is not null && _sergioStagingResult.HasRejections && _acceptedSergioFilePath is not null;
+        SergioExportRejectedButton.IsEnabled = !isBusy && HasCurrentSergioExportSource();
         BrowseFolderButton.IsEnabled = !isBusy;
         RejectedFolderLabel.IsEnabled = !isBusy;
         RejectedFolderTextBox.IsEnabled = !isBusy;
@@ -268,8 +267,7 @@ public partial class MainWindow : Window
     private void SergioPrimaryKeyComboBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         CleanupSergioCandidate();
-        _sergioStagingResult = null;
-        _sergioRejectionContinuationAccepted = false;
+        InvalidateSergioInteractiveState();
         SergioSummaryTextBlock.Text = "Estado: clave modificada; vuelva a validar la carga.";
         UpdateSergioControls();
     }
@@ -279,12 +277,14 @@ public partial class MainWindow : Window
         if (_isBusy || _acceptedSergioHeaders is null || _acceptedSergioFilePath is null || SergioPrimaryKeyComboBox.SelectedItem is not string selectedKey) return;
         var request = new SergioStagingRequest(_acceptedSergioFilePath, _acceptedSergioHeaders, selectedKey);
         CleanupSergioCandidate();
+        InvalidateSergioInteractiveState();
         SetBusy(true, "Validando y preparando carga de Sergio...");
         try
         {
             var result = await Task.Run(() => _sergioAnalyzer.Analyze(request));
             _sergioCandidateTable = result.CandidateTableName;
             _sergioStagingResult = result;
+            _sergioExportSourceTable = result.CandidateTableName;
             _sergioRejectionContinuationAccepted = !result.HasRejections;
             var presentation = SergioInteractionPolicy.For(result);
             SergioSummaryTextBlock.Text = $"PK: {presentation.SelectedPrimaryKey}. Importadas: {presentation.ImportedRows}. Válidas: {presentation.ValidRows}. Filas vacías: {presentation.EmptyRows}. Grupos duplicados: {presentation.DuplicateGroups}. Filas duplicadas: {presentation.DuplicateRows}. Rechazadas: {presentation.RejectedRows}.";
@@ -323,6 +323,7 @@ public partial class MainWindow : Window
             SetBusy(true, "Paso 2: publicando carga oficial...");
             await Task.Run(() => _sergioLoadPromoter.Promote(candidate, selectedKey, sourcePath));
             _sergioCandidateTable = null;
+            _sergioExportSourceTable = SergioLoadPromoter.LastImportTableName;
             SergioSummaryTextBlock.Text = $"Carga oficial actualizada: {preview.ValidRows} filas válidas de {preview.SourceFileName}. Rechazadas retenidas: {preview.RejectedRows}.";
             AddActivity("Paso 2", $"Carga oficial de Sergio actualizada: archivo {preview.SourceFileName}, filas válidas {preview.ValidRows}, rechazadas retenidas {preview.RejectedRows}, fecha {DateTime.Now:g}.");
         }
@@ -343,18 +344,37 @@ public partial class MainWindow : Window
         finally { _sergioCandidateTable = null; }
     }
 
+    private void InvalidateSergioInteractiveState()
+    {
+        _sergioStagingResult = null;
+        _sergioRejectionContinuationAccepted = false;
+        _sergioExportSourceTable = null;
+    }
+
+    private bool HasCurrentSergioExportSource() =>
+        _sergioExportSourceTable is not null &&
+        _sergioStagingResult is not null &&
+        _sergioStagingResult.HasRejections &&
+        _acceptedSergioFilePath is not null;
+
     private bool AskToContinue(SergioStagingPresentation presentation) =>
         new SergioRejectionDecisionDialog(presentation) { Owner = this }.ShowDialog() == true;
 
     private async void SergioExportRejectedButton_OnClick(object sender, RoutedEventArgs e)
     {
-        if (_isBusy || _sergioStagingResult is null || !_sergioStagingResult.HasRejections || _acceptedSergioFilePath is null) return;
-        var source = _sergioCandidateTable ?? SergioLoadPromoter.LastImportTableName;
-        var workbookPath = _acceptedSergioFilePath;
+        if (_isBusy || !HasCurrentSergioExportSource()) return;
+        var source = _sergioExportSourceTable!;
+        var workbookPath = _acceptedSergioFilePath!;
         SetBusy(true, "Paso 2: exportando filas rechazadas...");
         try
         {
             var exported = await Task.Run(() => _sergioRejectedExporter.Export(source, workbookPath));
+            if (!exported.HasOutput || string.IsNullOrWhiteSpace(exported.OutputPath))
+            {
+                AddActivity("Paso 2", "No había filas rechazadas para exportar.");
+                SergioSummaryTextBlock.Text = "No había filas rechazadas para exportar.";
+                return;
+            }
             AddActivity("Paso 2", $"Rechazados exportados: {exported.RejectedCount}. Salida completa: {exported.OutputPath}");
             SergioSummaryTextBlock.Text = $"Se exportaron {exported.RejectedCount} filas rechazadas. Salida: {exported.OutputPath}";
         }
@@ -370,7 +390,7 @@ public partial class MainWindow : Window
     {
         SergioValidateButton.IsEnabled = !_isBusy && File.Exists(_acceptedSergioFilePath) && _acceptedSergioHeaders?.Columns.Count > 0 && SergioPrimaryKeyComboBox.SelectedItem is string;
         SergioPreviewButton.IsEnabled = !_isBusy && _sergioCandidateTable is not null && (_sergioStagingResult?.ValidRows ?? 0) > 0;
-        SergioExportRejectedButton.IsEnabled = !_isBusy && _sergioStagingResult is not null && _sergioStagingResult.HasRejections && _acceptedSergioFilePath is not null;
+        SergioExportRejectedButton.IsEnabled = !_isBusy && HasCurrentSergioExportSource();
     }
 
     private void RemoveDuplicatesButton_OnClick(object sender, RoutedEventArgs e) =>

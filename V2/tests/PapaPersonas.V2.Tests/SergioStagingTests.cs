@@ -37,6 +37,16 @@ public sealed class SergioStagingTests
     }
 
     [Fact]
+    public void RejectionDecisionMessageNamesKeyAndEveryCountAndExclusion()
+    {
+        var presentation = new SergioStagingPresentation("CUIL (1)", 10, 4, 2, 1, 4, 6);
+
+        var message = SergioInteractionPolicy.RejectionDecisionMessage(presentation);
+
+        Assert.Equal("Clave primaria seleccionada: CUIL (1). Importadas: 10. Válidas: 4. Filas con clave vacía: 2. Grupos duplicados: 1. Filas duplicadas: 4. Total rechazadas: 6. Todas las filas rechazadas serán excluidas. ¿Desea continuar?", message);
+    }
+
+    [Fact]
     public void FormatterPreservesStringsAndUsesDeterministicText()
     {
         Assert.Equal("1", SergioCellTextFormatter.Format(1.0));
