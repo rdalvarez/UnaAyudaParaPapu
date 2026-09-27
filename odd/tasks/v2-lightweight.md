@@ -182,7 +182,7 @@ The current application contains a cumulative master-database workflow that is n
   - Evidence: pending.
 
 - [x] **V2L-010 — Build cleaning execution preflight**
-  - Route: direct bounded implementation.
+  - Route: delegated direct.
   - Scope: create a pure preflight that deduplicates repeated steps by `(action, column position)` while preserving the first occurrence/order, reports omitted steps, and compares the current raw header sequence against the planning snapshot by count, order, and exact identity. Do not read data rows, create output files, enable generation, or change UI behavior.
   - Acceptance: same-column/same-action repeats are omitted; different actions on the same column remain; header differences abort preflight with a clear result; no source state mutates.
   - Checks: focused unit tests, Release build, complete V2 tests, and structural readback.
@@ -193,15 +193,35 @@ The current application contains a cumulative master-database workflow that is n
     - Structural readback: passed; `CleaningExecutionPreflight` is a pure shell model, compares raw headers with ordinal null-preserving identity, validates positions, deduplicates only `(action, position)`, reports omitted metadata, renumbers an execution copy, and does not mutate the visible plan or snapshots. No UI, file, row, output, generation, Sergio, DuckDB, or V1 code was added.
     - Rollback boundary: remove `CleaningExecutionPreflight.cs`, its focused tests, and the V2L-010 README/ODD evidence only.
     - RDD risk: `disabled/unmanaged`.
-    - Commit: `feat(v2): add cleaning execution preflight` (single work-unit commit for this implementation).
+    - Commit: `25a2022` (`feat(v2): add cleaning execution preflight`).
     - Next step: V2L-011 motor temporal, still not implemented.
 
-- [ ] **V2L-011 — Execute cleaning through fixed temporary files**
-  - Status: future implementation task after V2L-010 verification.
-  - Scope: use `%LOCALAPPDATA%\PapaPersonas\V2\temp` as one exclusive workspace, clean stale content before processing, stream input to temporaries, apply each normalized cycle in order, write UTF-8 BOM comma-delimited CSV outputs, and always clean the workspace in `finally`. No DuckDB and no whole-file row materialization.
+- [x] **V2L-011 — Build the fixed temporary workspace and streaming CSV transport**
+  - Route: delegated direct because the infrastructure and its edge-case tests span multiple non-trivial files.
+  - Scope: create an injectable fixed workspace abstraction whose production root is `%LOCALAPPDATA%\PapaPersonas\V2\temp`; remove stale content before starting, refuse to continue when reset fails, expose deterministic working paths, and delete the workspace on dispose even after failures. Add streaming CSV read/write primitives for comma-delimited UTF-8 BOM files without materializing rows.
+  - CSV transport: preserve whitespace and embedded commas, quotes, CR/LF, empty strings, and Unicode. Use one-row CSV analysis and never request `RowCount`.
+  - Exclusions: no Excel data-row export, cleaning rules, output publication, UI wiring, or generation button changes yet.
+  - Checks: focused lifecycle/round-trip tests, Release build, complete V2 tests, and structural readback.
+  - Evidence:
+    - `dotnet build V2/PapaPersonas.sln -c Release --no-restore`: passed; 0 warnings, 0 errors.
+    - `dotnet test V2/PapaPersonas.sln -c Release --no-build`: passed; 18 passed, 0 failed, 0 skipped.
+    - Structural readback: passed; fixed workspace reset/cleanup is injectable and deterministic, production root uses `Environment.SpecialFolder.LocalApplicationData`, CSV uses ExcelDataReader `CreateCsvReader` with comma-only detection, one-row analysis, whitespace preservation, and no `RowCount`/`AsDataSet`; no UI, Excel data-row, cleaning, output, or V1 code was added.
+    - Round-trip tests passed for empty fields, whitespace, commas, quotes, CR/LF, and requested Unicode values; UTF-8 BOM bytes were verified. Tests use only explicit roots under `Path.GetTempPath()` and never touch real LocalAppData.
+    - Runtime harness: `N/A` — infrastructure is intentionally disconnected from UI/execution; focused lifecycle and round-trip tests are the applicable functional boundary.
+    - Rollback boundary: remove the fixed-workspace and streaming CSV source/tests plus this V2L-011 README/ODD evidence; V2L-010 and all UI/V1 behavior remain outside the boundary.
+    - RDD risk: `disabled/unmanaged`.
+    - Commit: this work-unit commit (`feat(v2): add streaming temporary transport`).
+
+- [ ] **V2L-012 — Execute cleaning cycles and publish outputs**
+  - Status: future implementation task after V2L-011 verification.
+  - Scope: stream Excel rows into the fixed workspace, apply each normalized cycle in order, write target outputs safely, and always clean the workspace in `finally`. No DuckDB and no whole-file row materialization.
   - Output: clean CSV beside the original; one consolidated rejected CSV inside the selected `rech` folder. Both names use the source base name plus timestamp. Rejected metadata columns appear first: `PP_MOTIVO`, `PP_PASO`, `PP_COLUMNA`, `PP_VALOR`, followed by every original column in order.
   - Duplicate semantics: compare trimmed non-empty values case-insensitively; reject every row in repeated groups. Empty semantics: trim the selected value and reject when empty.
-  - Completion: later UI wiring shows cycle logs and a final custom dialog with `Abrir carpeta` (opens the source folder) and `Aceptar`.
+  - Evidence: pending.
+
+- [ ] **V2L-013 — Wire execution progress and completion UI**
+  - Status: future implementation task after V2L-012 verification.
+  - Scope: enable generation only for a valid input, output folder, and non-empty plan; run asynchronously with the existing busy guard; render validation/cycle/output logs; and show a final custom dialog with `Abrir carpeta` (opens the source folder) and `Aceptar`.
   - Evidence: pending.
 
 ## Confirmed Future Cleaning Semantics
@@ -215,4 +235,4 @@ The current application contains a cumulative master-database workflow that is n
 
 ## Progress and Next Step
 
-`V2L-001` through `V2L-008` and V2L-010 are complete and the single-pass speed improvement is manually accepted. V2L-011 performs the later temporary-file execution and remains unimplemented. Source-format extensibility and TXT log export remain future work.
+`V2L-001` through `V2L-008` and V2L-010/V2L-011 are complete and the single-pass speed improvement is manually accepted. V2L-012 adds the engine and V2L-013 wires the UI. Source-format extensibility and TXT log export remain future work.
