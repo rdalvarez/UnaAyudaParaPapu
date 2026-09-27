@@ -112,7 +112,7 @@
                                 <ComboBox x:Name="SergioPrimaryKeyComboBox" IsEnabled="False" AutomationProperties.Name="Clave primaria de Sergio" SelectionChanged="SergioPrimaryKeyComboBox_OnSelectionChanged" />
                             </GroupBox>
                              <Button x:Name="SergioValidateButton" Margin="0,12,0,0" Width="240" HorizontalAlignment="Left" Content="Validar y preparar carga" IsEnabled="False" Click="SergioValidateButton_OnClick" />
-                             <Button x:Name="SergioPreviewButton" Margin="0,8,0,0" Width="240" HorizontalAlignment="Left" Content="Vista previa y cargar" IsEnabled="False" Click="SergioPreviewButton_OnClick" />
+                             <StackPanel Orientation="Horizontal" Margin="0,8,0,0"><Button x:Name="SergioPreviewButton" Width="240" Content="Vista previa y cargar" IsEnabled="False" Click="SergioPreviewButton_OnClick" /><Button x:Name="SergioExportRejectedButton" Margin="8,0,0,0" Width="190" Content="Exportar rechazados" IsEnabled="False" Click="SergioExportRejectedButton_OnClick" AutomationProperties.Name="Exportar rechazados" /></StackPanel>
                             <TextBlock x:Name="SergioSummaryTextBlock" Margin="0,12,0,0" Foreground="#FF666666" Text="Estado: falta aceptar archivo, encabezados y clave primaria." TextWrapping="Wrap" />
                         </StackPanel>
                     </ScrollViewer>
@@ -128,7 +128,7 @@
         </GroupBox>
 
         <Border Grid.Row="6" Padding="8" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFF9F9F9">
-            <TextBlock Text="La limpieza de la Solapa 1 y el preflight de encabezados de Sergio están conectados. Sergio todavía no procesa filas ni usa DuckDB; TXT, Stock y Consultas permanecen fuera de alcance." TextWrapping="Wrap" />
+             <TextBlock Text="La limpieza de la Solapa 1 y la carga de Sergio están conectadas. La carga de Sergio clasifica filas, permite revisar válidas y rechazadas, y publica la información válida en DuckDB; TXT, Stock y Consultas permanecen fuera de alcance." TextWrapping="Wrap" />
         </Border>
     </Grid>
 </Window>

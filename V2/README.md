@@ -1,6 +1,8 @@
 # PapaPersonas V2
 
-V2 now connects **Preparar archivo de Hernán** end to end: selecting an Excel workbook preserves its raw headers, exposes normalized dynamic columns, builds an ordered plan, executes it asynchronously through the verified coordinator, publishes paired CSV outputs, and reports evidence in the newest-first activity log. The Sergio tab performs accepted-header preflight, streams the workbook once into an isolated DuckDB staging table with all aliases as `VARCHAR`, validates the selected key with `TRIM()`, and retains valid candidates. **Vista previa y cargar** reads only the owned candidate, shows at most 20 rows in schema order, the basename, row count, selected key, and prior metadata, then requires explicit **Cargar** or **Reemplazar** confirmation. Promotion atomically replaces `sergio_current` and maintains the single-row `sergio_load_metadata`; failures roll back the replacement and retain the candidate for retry. Preview values remain dialog-local and are never logged. Storage is `%LOCALAPPDATA%\PapaPersonas\V2\papapersonas-v2.duckdb`. Progress/status and the activity log are global shell surfaces shared by all tabs; Stock and Consultas remain disabled.
+V2 now connects **Preparar archivo de Hernán** end to end. The Sergio tab performs accepted-header preflight, stages every workbook row in DuckDB, and reports the selected PK plus imported, valid, empty, duplicate-group, duplicate-row, and rejected counts. `CLAVE_VACIA` covers null/blank trimmed keys; `CLAVE_DUPLICADA` covers every row in a non-empty duplicate group. Mixed results require explicit **Continuar**/**Cancelar**; cancellation performs no official mutation while retaining the candidate and export action. Zero valid rows block preview/promotion but still permit export.
+
+**Exportar rechazados** writes `PP_MOTIVO` followed by source columns to the sibling `rech` directory, asynchronously, and logs only count and full path. **Vista previa y cargar** shows only valid rows and states imported, valid-to-load, rejected-excluded, and PK values before **Cargar**/**Reemplazar**. Promotion atomically replaces `sergio_current`, stores valid-row count in metadata, and retains the complete import as `sergio_last_import` so rejected export remains available. Failures retain a retryable candidate. Storage is `%LOCALAPPDATA%\PapaPersonas\V2\papapersonas-v2.duckdb`.
 
 ## Verification
 
@@ -22,4 +24,4 @@ V2L-011 adds reusable fixed-workspace and streaming CSV infrastructure. The prod
 
 ## Current verification boundary
 
-The next step is a user-performed manual smoke with a representative workbook; visual acceptance and execution timing are not claimed here. Only explicitly authorized follow-up fixes should be made. TXT export and CSV/TXT input remain future work.
+SRJ-004 verification uses focused state/text tests, full Release tests, a Release build without restore, diff check, and structural readback. GUI smoke is N/A because no safe representative workbook was available; no automatic file open or process launch is used. TXT export and CSV/TXT input remain future work.

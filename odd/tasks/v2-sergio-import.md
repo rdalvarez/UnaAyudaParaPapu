@@ -77,3 +77,6 @@ Sergio workbooks can contain empty or repeated headers. Persisting those headers
 ## Progress
 
 SER-001 through SER-004 are complete after their recorded checks. RDD remains disabled/unmanaged. SER-004 uses explicit confirmation before atomically replacing the prior official execution.
+# Superseding note
+
+The current V2 Sergio workflow is superseded by `odd/tasks/v2-sergio-rejection-staging.md` and its SRJ-001 through SRJ-004 evidence. This historical document remains below; earlier assumptions about rejecting the entire staging candidate no longer describe current behavior.

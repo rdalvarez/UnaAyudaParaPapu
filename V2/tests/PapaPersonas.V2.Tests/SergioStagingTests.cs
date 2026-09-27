@@ -10,13 +10,30 @@ public sealed class SergioStagingTests
     [Fact]
     public void PreviewTextDistinguishesFirstLoadAndReplacement()
     {
-        var first = new SergioPreview(["CUIL"], [], 2, "CUIL", "first.xlsx", false, null);
+        var first = new SergioPreview(["CUIL"], [], 2, "CUIL", "first.xlsx", false, null, 2);
         var replacement = first with { PreviousOfficialExists = true, PreviousMetadata = new SergioLoadMetadata("old.xlsx", DateTime.UtcNow, 1, "CUIL", null) };
 
         Assert.Equal("Cargar", SergioLoadPreviewText.Action(first));
         Assert.Equal("Reemplazar", SergioLoadPreviewText.Action(replacement));
         Assert.Contains("sergio_current", SergioLoadPreviewText.Warning(replacement));
         Assert.DoesNotContain("reemplazará", SergioLoadPreviewText.Warning(first));
+        Assert.Contains("Importadas: 2", SergioLoadPreviewText.Summary(first));
+        Assert.Contains("Válidas a cargar: 2", SergioLoadPreviewText.Summary(first));
+        Assert.Contains("Rechazadas excluidas: 0", SergioLoadPreviewText.Summary(first));
+    }
+
+    [Fact]
+    public void SergioInteractionPolicyRequiresDecisionOnlyForMixedRejectedRows()
+    {
+        var mixed = new SergioStagingPresentation("CUIL", 5, 1, 2, 1, 2, 4);
+        var clean = mixed with { ImportedRows = 2, ValidRows = 2, EmptyRows = 0, DuplicateGroups = 0, DuplicateRows = 0, RejectedRows = 0 };
+        var zeroValid = mixed with { ValidRows = 0, RejectedRows = 5 };
+
+        Assert.True(mixed.DecisionRequired);
+        Assert.False(SergioInteractionPolicy.ContinueAutomatically(mixed));
+        Assert.True(SergioInteractionPolicy.ContinueAutomatically(clean));
+        Assert.False(zeroValid.CanPreviewOrPromote);
+        Assert.True(zeroValid.CanExport);
     }
 
     [Fact]
