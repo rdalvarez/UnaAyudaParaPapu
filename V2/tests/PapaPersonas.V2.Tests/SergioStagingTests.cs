@@ -44,6 +44,77 @@ public sealed class SergioStagingTests
     }
 
     [Fact]
+    public void AcceptedRawDuplicateAndEmptyHeadersStageWithChosenValidAlias()
+    {
+        using var workspace = new TestWorkspace();
+        var workbook = workspace.CreateWorkbook(["CUIL", null!, "Nombre", "Nombre"], [["20-1", "x", "Ana", "Alias"]]);
+        var headers = SergioHeaderPreflight.Analyze(["CUIL", null, "Nombre", "Nombre"]);
+        var analyzer = new SergioStagingAnalyzer(new DuckDbPathPolicy(workspace.DatabasePath));
+
+        var result = analyzer.Analyze(new SergioStagingRequest(workbook, headers, "CUIL"));
+
+        Assert.True(result.IsValid);
+        Assert.Equal(["CUIL", "Columna Vacia", "Nombre", "Nombre (1)"], result.Aliases);
+        Assert.True(TableExists(Open(workspace.DatabasePath), result.CandidateTableName));
+        analyzer.Cleanup(result.CandidateTableName);
+    }
+
+    [Fact]
+    public void DuplicateAliasCanBeSelectedAsPrimaryKeyIndependently()
+    {
+        using var workspace = new TestWorkspace();
+        var workbook = workspace.CreateWorkbook(["CUIL", "CUIL"], [["20-1", "20-2"]]);
+        var headers = SergioHeaderPreflight.Analyze(["CUIL", "CUIL"]);
+        var analyzer = new SergioStagingAnalyzer(new DuckDbPathPolicy(workspace.DatabasePath));
+
+        var result = analyzer.Analyze(new SergioStagingRequest(workbook, headers, "CUIL (1)"));
+
+        Assert.True(result.IsValid);
+        Assert.Equal("CUIL (1)", result.SelectedPrimaryKeyAlias);
+        analyzer.Cleanup(result.CandidateTableName);
+    }
+
+    [Fact]
+    public void CleanupDoesNotDropUnknownReservedLookingTable()
+    {
+        using var workspace = new TestWorkspace();
+        var unknown = "sergio_staging_0123456789abcdef0123456789abcdef";
+        using (var connection = Open(workspace.DatabasePath))
+        using (var command = connection.CreateCommand()) { command.CommandText = $"CREATE TABLE \"{unknown}\"(value VARCHAR)"; command.ExecuteNonQuery(); }
+        var analyzer = new SergioStagingAnalyzer(new DuckDbPathPolicy(workspace.DatabasePath));
+
+        analyzer.Cleanup(unknown);
+
+        using var verify = Open(workspace.DatabasePath);
+        Assert.True(TableExists(verify, unknown));
+    }
+
+    [Fact]
+    public void FirstAnalyzeRemovesExactStaleCandidatesButPreservesNearMatches()
+    {
+        using var workspace = new TestWorkspace();
+        var stale = "sergio_staging_0123456789abcdef0123456789abcdef";
+        var nearMatch = "sergio_staging_0123456789abcdef0123456789abcde";
+        var unrelated = "sergio_staging_extra";
+        using (var connection = Open(workspace.DatabasePath))
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = $"CREATE TABLE \"{stale}\"(value VARCHAR); CREATE TABLE \"{nearMatch}\"(value VARCHAR); CREATE TABLE \"{unrelated}\"(value VARCHAR);";
+            command.ExecuteNonQuery();
+        }
+        var analyzer = new SergioStagingAnalyzer(new DuckDbPathPolicy(workspace.DatabasePath));
+        var workbook = workspace.CreateWorkbook(["CUIL"], [["20-1"]]);
+
+        var result = analyzer.Analyze(new SergioStagingRequest(workbook, SergioHeaderPreflight.Analyze(["CUIL"]), "CUIL"));
+
+        using var verify = Open(workspace.DatabasePath);
+        Assert.False(TableExists(verify, stale));
+        Assert.True(TableExists(verify, nearMatch));
+        Assert.True(TableExists(verify, unrelated));
+        analyzer.Cleanup(result.CandidateTableName);
+    }
+
+    [Fact]
     public void DuplicateTrimmedKeyLeavesNoCandidateAndPreservesUnrelatedTable()
     {
         using var workspace = new TestWorkspace();

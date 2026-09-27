@@ -5,8 +5,12 @@ namespace PapaPersonas.V2.Shell;
 
 public sealed class SergioStagingException : IOException
 {
+    public Exception? CleanupException { get; }
+
     public SergioStagingException(string message) : base(message) { }
     public SergioStagingException(string message, Exception innerException) : base(message, innerException) { }
+    public SergioStagingException(string message, Exception innerException, Exception cleanupException)
+        : base(message, innerException) => CleanupException = cleanupException;
 }
 
 public sealed class DuckDbPathPolicy
@@ -83,6 +87,7 @@ public sealed class SergioStagingAnalyzer
     public SergioStagingResult Analyze(SergioStagingRequest request, CancellationToken cancellationToken = default)
     {
         ValidateRequest(request);
+        CleanupStaleCandidatesOnce();
         var databasePath = pathPolicy.GetDatabasePath();
         Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
         string? candidate = null;
@@ -93,6 +98,7 @@ public sealed class SergioStagingAnalyzer
             ValidateHeaders(cursor.Headers, request.AcceptedHeaders);
             var aliases = request.AcceptedHeaders.Columns.Select(column => column.ProposedAlias).ToArray();
             candidate = CreateCandidateName();
+            lock (sync) ownedCandidates.Add(candidate);
             using var connection = Open(databasePath);
             using var transaction = connection.BeginTransaction();
             Execute(connection, transaction, $"CREATE TABLE {Quote(candidate)} ({string.Join(", ", aliases.Select(alias => $"{Quote(alias)} VARCHAR"))})");
@@ -122,30 +128,35 @@ public sealed class SergioStagingAnalyzer
             {
                 Execute(connection, transaction, $"DROP TABLE {Quote(candidate)}");
                 transaction.Commit();
+                lock (sync) ownedCandidates.Remove(candidate);
                 candidate = null;
             }
             else
             {
                 transaction.Commit();
-                lock (sync) ownedCandidates.Add(candidate);
             }
 
             return metrics with { CandidateTableName = candidate ?? string.Empty, Aliases = aliases, SelectedPrimaryKeyAlias = request.SelectedPrimaryKeyAlias };
         }
         catch (OperationCanceledException exception)
         {
-            DropAttemptCandidate(databasePath, candidate);
-            throw new SergioStagingException("Sergio staging was canceled.", exception);
+            var cleanupException = DropAttemptCandidate(databasePath, candidate);
+            throw cleanupException is null
+                ? new SergioStagingException("Sergio staging was canceled.", exception)
+                : new SergioStagingException("Sergio staging was canceled.", exception, cleanupException);
         }
-        catch (SergioStagingException)
+        catch (SergioStagingException exception)
         {
-            DropAttemptCandidate(databasePath, candidate);
-            throw;
+            var cleanupException = DropAttemptCandidate(databasePath, candidate);
+            if (cleanupException is null) throw;
+            throw new SergioStagingException(exception.Message, exception, cleanupException);
         }
         catch (Exception exception)
         {
-            DropAttemptCandidate(databasePath, candidate);
-            throw new SergioStagingException("Sergio staging failed.", exception);
+            var cleanupException = DropAttemptCandidate(databasePath, candidate);
+            throw cleanupException is null
+                ? new SergioStagingException("Sergio staging failed.", exception)
+                : new SergioStagingException("Sergio staging failed.", exception, cleanupException);
         }
     }
 
@@ -173,6 +184,32 @@ public sealed class SergioStagingAnalyzer
         string candidate;
         do candidate = $"sergio_staging_{Guid.NewGuid():N}"; while (IsTableNameTaken(candidate));
         return candidate;
+    }
+
+    private void CleanupStaleCandidatesOnce()
+    {
+        lock (sync)
+        {
+            if (staleCleanupCompleted) return;
+
+            var databasePath = pathPolicy.GetDatabasePath();
+            Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
+            using var connection = Open(databasePath);
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT table_name FROM information_schema.tables";
+            using var reader = command.ExecuteReader();
+            var staleCandidates = new List<string>();
+            while (reader.Read())
+            {
+                var name = reader.GetString(0);
+                if (IsReservedCandidateName(name) && !ownedCandidates.Contains(name)) staleCandidates.Add(name);
+            }
+
+            foreach (var candidate in staleCandidates)
+                Execute(connection, null, $"DROP TABLE {Quote(candidate)}");
+
+            staleCleanupCompleted = true;
+        }
     }
 
     private bool IsTableNameTaken(string name)
@@ -203,8 +240,12 @@ public sealed class SergioStagingAnalyzer
     {
         ArgumentNullException.ThrowIfNull(request);
         if (string.IsNullOrWhiteSpace(request.WorkbookPath) || !File.Exists(request.WorkbookPath)) throw new SergioStagingException("The Sergio workbook must be an existing file.");
-        if (request.AcceptedHeaders.Columns.Count == 0 || request.AcceptedHeaders.HasIssues) throw new SergioStagingException("Accepted Sergio headers must be non-empty and globally unique.");
-        if (request.AcceptedHeaders.Columns.Count(column => string.Equals(column.ProposedAlias, request.SelectedPrimaryKeyAlias, StringComparison.Ordinal)) != 1) throw new SergioStagingException("The selected Sergio primary key must match exactly one accepted alias.");
+        var columns = request.AcceptedHeaders.Columns;
+        if (columns.Count == 0) throw new SergioStagingException("Accepted Sergio headers must contain at least one column.");
+        if (columns.Any(column => string.IsNullOrWhiteSpace(column.ProposedAlias))) throw new SergioStagingException("Accepted Sergio aliases must be non-empty.");
+        if (columns.Select(column => column.ProposedAlias).Distinct(StringComparer.Ordinal).Count() != columns.Count) throw new SergioStagingException("Accepted Sergio aliases must be globally unique.");
+        if (!columns.Select(column => column.Position).OrderBy(position => position).SequenceEqual(Enumerable.Range(0, columns.Count))) throw new SergioStagingException("Accepted Sergio header positions must cover each column exactly once.");
+        if (columns.Count(column => string.Equals(column.ProposedAlias, request.SelectedPrimaryKeyAlias, StringComparison.Ordinal)) != 1) throw new SergioStagingException("The selected Sergio primary key must match exactly one accepted alias.");
     }
 
     private static void ValidateHeaders(IReadOnlyList<string?> actual, SergioHeaderPreflightResult accepted)
@@ -216,16 +257,23 @@ public sealed class SergioStagingAnalyzer
 
     private static DuckDBConnection Open(string path) { var connection = new DuckDBConnection(new DuckDBConnectionStringBuilder { DataSource = path }.ConnectionString); connection.Open(); return connection; }
     private static void Execute(DuckDBConnection connection, DuckDBTransaction? transaction, string sql) { using var command = connection.CreateCommand(); command.Transaction = transaction; command.CommandText = sql; command.ExecuteNonQuery(); }
-    private static void DropAttemptCandidate(string databasePath, string? candidate)
+    private Exception? DropAttemptCandidate(string databasePath, string? candidate)
     {
-        if (candidate is null) return;
+        if (candidate is null || !IsOwnedName(candidate)) return null;
         try
         {
             using var connection = Open(databasePath);
             Execute(connection, null, $"DROP TABLE IF EXISTS {Quote(candidate)}");
+            lock (sync) ownedCandidates.Remove(candidate);
+            return null;
         }
-        catch { }
+        catch (Exception exception) { return exception; }
     }
     private static string Quote(string identifier) => $"\"{identifier.Replace("\"", "\"\"")}\"";
-    private static bool IsOwnedName(string name) => name.StartsWith("sergio_staging_", StringComparison.Ordinal) && Guid.TryParseExact(name[15..], "N", out _);
+    private bool staleCleanupCompleted;
+    private static bool IsReservedCandidateName(string name) => name.StartsWith("sergio_staging_", StringComparison.Ordinal) && name.Length == 47 && name[15..].All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
+    private bool IsOwnedName(string name)
+    {
+        lock (sync) return ownedCandidates.Contains(name);
+    }
 }
