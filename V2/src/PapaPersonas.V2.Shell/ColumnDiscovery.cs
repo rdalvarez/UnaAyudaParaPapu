@@ -49,9 +49,11 @@ public sealed class CleaningPlan
 
 public static class HeaderPresentation
 {
+    // Duplicate suffixes depend on appearance order; reordered headers can point a saved identity to another occurrence.
     public static IReadOnlyList<DetectedColumn> Normalize(IReadOnlyList<string?> headers)
     {
-        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        var usedDisplayNames = new HashSet<string>(StringComparer.Ordinal);
         var result = new List<DetectedColumn>(headers.Count);
         var unnamed = 0;
 
@@ -65,9 +67,15 @@ public static class HeaderPresentation
             }
 
             counts.TryGetValue(baseName, out var occurrence);
-            occurrence++;
-            counts[baseName] = occurrence;
-            result.Add(new DetectedColumn(position, occurrence == 1 ? baseName : $"{baseName} ({occurrence})"));
+            var candidate = occurrence == 0 ? baseName : $"{baseName} ({occurrence})";
+            counts[baseName] = occurrence + 1;
+            var collisionSuffix = 1;
+            while (!usedDisplayNames.Add(candidate))
+            {
+                candidate = $"{baseName} ({occurrence}) ({collisionSuffix++})";
+            }
+
+            result.Add(new DetectedColumn(position, candidate));
         }
 
         return result;

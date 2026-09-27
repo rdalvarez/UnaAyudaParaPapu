@@ -39,8 +39,25 @@ public sealed class TabCatalogTests
     {
         var columns = HeaderPresentation.Normalize([" Name ", "", "name", "", "Age"]);
 
-        Assert.Equal(["Name", "Columna sin nombre 1", "name (2)", "Columna sin nombre 2", "Age"], columns.Select(column => column.DisplayName));
+        Assert.Equal(["Name", "Columna sin nombre 1", "name", "Columna sin nombre 2", "Age"], columns.Select(column => column.DisplayName));
         Assert.Equal([0, 1, 2, 3, 4], columns.Select(column => column.Position));
+    }
+
+    [Fact]
+    public void HeaderPresentationNumbersExactOrdinalDuplicatesFromOne()
+    {
+        var columns = HeaderPresentation.Normalize(["Nombre", "Nombre", "Nombre", "Nombre"]);
+
+        Assert.Equal(["Nombre", "Nombre (1)", "Nombre (2)", "Nombre (3)"], columns.Select(column => column.DisplayName));
+    }
+
+    [Fact]
+    public void HeaderPresentationAvoidsCollisionsWithSyntheticSuffixesDeterministically()
+    {
+        var columns = HeaderPresentation.Normalize(["Nombre", "Nombre (1)", "Nombre", "Nombre (1)"]);
+
+        Assert.Equal(["Nombre", "Nombre (1)", "Nombre (1) (1)", "Nombre (1) (1) (1)"], columns.Select(column => column.DisplayName));
+        Assert.Equal(columns.Select(column => column.DisplayName).Distinct(StringComparer.Ordinal).Count(), columns.Count);
     }
 
     [Fact]

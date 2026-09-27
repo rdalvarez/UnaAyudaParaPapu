@@ -300,7 +300,16 @@ The current application contains a cumulative master-database workflow that is n
   - Evidence: `dotnet build V2/PapaPersonas.sln -c Release --no-restore` passed with 0 warnings and 0 errors; `dotnet test V2/PapaPersonas.sln -c Release --no-build` passed with 41 tests, 0 failures, and 0 skips; `git diff --check` passed. Structural readback confirms one global `ActivityTextBox`, one global `OperationProgressPanel`/`ProgressBar`, no progress `Visibility` toggling, idle reset in `SetBusy(false)`, a global splitter with `MinHeight="120"`, and four tabs with only Preparar enabled through the existing catalog. Bounded launch/close smoke passed; visual acceptance is not claimed.
   - Rollback: revert the global MainWindow layout/progress changes, README note, and this task entry; cleaning behavior, outputs, and tab availability remain unchanged.
   - RDD risk: `disabled/unmanaged`.
-  - Commit: pending until commit (`feat(v2): share global progress and activity`).
+   - Commit: pending until commit (`feat(v2): share global progress and activity`).
+
+- [x] **V2L-019 — Remember clean column selections**
+  - Objective: remember the operator's clean-output column choices without persisting workbook rows or changing the existing cleaning pipeline.
+  - Route: delegated direct.
+  - Acceptance: one reusable `%LOCALAPPDATA%\PapaPersonas\V2\settings.json` document uses exact Spanish JSON keys; visual names are ordinal and deterministic, settings load after header normalization, unknown names are ignored, and settings save only after successful generation before the completion dialog. Missing settings default to all selected; corrupt JSON is replaced with empty defaults and logged; permission/IO failures remain visible errors. Generate remains available only when at least one column is selected.
+  - Evidence: `dotnet build V2/PapaPersonas.sln -c Release --no-restore` passed with 0 warnings and 0 errors; `dotnet test V2/PapaPersonas.sln -c Release --no-build` passed with 48 tests, 0 failures, and 0 skips; `git diff --check` passed. Structural readback confirms one settings file with no row data, load/apply after normalized headers, save only after coordinator success and before the final dialog, no save in the failure path, the explicit order-dependency comment, and unchanged future tabs. Focused tests cover ordinal case sensitivity, duplicate numbering and suffix collisions, missing/corrupt settings, exact-name restore, deterministic JSON order, and temporary-file cleanup. Test roots use `Path.GetTempPath()` only.
+  - Rollback: revert `ColumnDiscovery.cs`, `ColumnSelectionSettings.cs`, `MainWindow.xaml.cs`, focused settings tests, README persistence note, and this task entry; prior non-persistent column selection behavior is restored.
+  - RDD risk: `disabled/unmanaged`.
+  - Commit: pending until commit (`feat(v2): remember clean column selections`).
 
 ## Confirmed Future Cleaning Semantics
 

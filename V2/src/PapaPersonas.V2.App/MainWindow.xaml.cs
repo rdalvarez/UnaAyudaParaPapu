@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     private readonly ActivityLog _activityLog = new();
     private readonly CleaningPlan _cleaningPlan = new();
     private readonly CleaningExecutionCoordinator _executionCoordinator = new();
+    private readonly ColumnSelectionSettingsStore _columnSelectionSettings = new();
     private string? _rejectedFolderPath;
     private IReadOnlyList<string?> _rawHeaders = [];
     private IReadOnlyList<OutputColumnSelection> _outputColumns = [];
@@ -71,11 +72,12 @@ public partial class MainWindow : Window
             SetBusy(true, "Leyendo encabezados...");
             var path = dialog.FileName;
             var rejectedFolder = RejectedFolderPolicy.GetDefault(path);
-            var rawHeaders = await Task.Run(() =>
+            var loadedSettings = await Task.Run(() =>
             {
                 Directory.CreateDirectory(rejectedFolder);
-                return _headerReader.ReadHeaders(path).ToArray();
+                return (_headerReader.ReadHeaders(path).ToArray(), _columnSelectionSettings.Load());
             });
+            var rawHeaders = loadedSettings.Item1;
             var columns = HeaderPresentation.Normalize(rawHeaders);
 
             InputFileTextBox.Text = path;
@@ -83,10 +85,15 @@ public partial class MainWindow : Window
             _rejectedFolderPath = rejectedFolder;
             ResetCleaningPlan();
             _rawHeaders = rawHeaders;
-            SetColumns(columns);
+            SetColumns(columns, loadedSettings.Item2.Document.ConfiguracionPaso1.DeselectedColumnNames);
             AddActivity($"Archivo seleccionado: {path}");
             AddActivity($"Carpeta de rechazados: {rejectedFolder}");
             AddActivity($"Columnas detectadas: {columns.Count}");
+            AddActivity($"Configuración de columnas cargada: {_columnSelectionSettings.Path}");
+            if (loadedSettings.Item2.WasReset)
+            {
+                AddActivity($"Advertencia: configuración corrupta reemplazada y restablecida: {_columnSelectionSettings.Path}");
+            }
         }
         catch (Exception exception)
         {
@@ -125,15 +132,20 @@ public partial class MainWindow : Window
         }
     }
 
-    private void SetColumns(IReadOnlyList<DetectedColumn> columns)
+    private void SetColumns(IReadOnlyList<DetectedColumn> columns, IReadOnlyList<string> deselectedNames)
     {
         _outputColumns = columns.Select(column => new OutputColumnSelection(column)).ToArray();
+        var applied = ColumnSelectionMemory.ApplyDeselected(
+            columns,
+            deselectedNames,
+            (column, isSelected) => _outputColumns.First(item => item.Column == column).IsSelected = isSelected);
         DetectedColumnsListBox.ItemsSource = _outputColumns;
         DuplicateColumnComboBox.ItemsSource = columns;
         EmptyColumnComboBox.ItemsSource = columns;
         DuplicateColumnComboBox.IsEnabled = columns.Count > 0;
         EmptyColumnComboBox.IsEnabled = columns.Count > 0;
         UpdateCleaningControls();
+        AddActivity($"Preferencias de columnas aplicadas: {applied}.");
     }
 
     private void OutputColumnCheckBox_OnChanged(object sender, RoutedEventArgs e) => UpdateCleaningControls();
@@ -246,6 +258,25 @@ public partial class MainWindow : Window
             AddActivity($"Salida de rechazados: {result.RejectedOutputPath}");
             if (result.CleanupWarning is not null) AddActivity($"Advertencia de limpieza temporal: {result.CleanupWarning}");
             CycleSummaryTextBlock.Text = $"Proceso completado. Rechazadas: {result.TotalRejectedRows}. Restantes: {result.RemainingRows}.";
+            var deselectedNames = ColumnSelectionMemory.CaptureDeselected(
+                _outputColumns.Select(column => column.Column).ToArray(),
+                column => _outputColumns.First(item => item.Column == column).IsSelected);
+            try
+            {
+                _columnSelectionSettings.Save(new ColumnSelectionSettingsDocument
+                {
+                    ConfiguracionPaso1 = new Paso1ColumnSelectionSettings
+                    {
+                        DeselectedColumnNames = deselectedNames.ToList()
+                    }
+                });
+                AddActivity($"Configuración de columnas guardada: {_columnSelectionSettings.Path}");
+            }
+            catch (Exception settingsException)
+            {
+                AddActivity($"Advertencia: no se pudo guardar la configuración de columnas: {settingsException.Message}");
+                System.Windows.MessageBox.Show(this, $"Los archivos de salida se generaron correctamente, pero no se pudo guardar la selección de columnas.\n\nDetalle técnico: {settingsException.Message}", "No se pudo guardar la configuración", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
             new CompletionDialog(result, inputPath) { Owner = this }.ShowDialog();
         }
         catch (Exception exception)
