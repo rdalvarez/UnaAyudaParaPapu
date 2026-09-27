@@ -161,17 +161,25 @@ The current application contains a cumulative master-database workflow that is n
   - Acceptance: header discovery still returns the same first-row values and positional identities while no longer requesting the initial full scan; build, tests, and a before/after measurement with the same real workbook are reported honestly.
   - Checks: focused reader/configuration tests, Release build, complete V2 tests, runtime harness, and user-observed timing when private input cannot be used automatically.
   - Rollback boundary: ExcelDataReader header-reader configuration and related evidence only.
-   - Evidence:
-     - `dotnet build V2/PapaPersonas.sln -c Release --no-restore`: passed; 0 warnings, 0 errors.
-     - `dotnet test V2/PapaPersonas.sln -c Release --no-build`: passed; 8 passed, 0 failed, 0 skipped.
-     - Readback: `ExcelDataReaderHeaderReader` passes `HeaderReaderConfiguration.Create()` to `CreateReader`; that configuration sets `SinglePassMode = true`. Header discovery calls `Read()` once, uses the resulting `FieldCount`, preserves raw value order and positional normalization, and does not use `RowCount`.
-     - Configuration seam test: passed; the productive configuration factory returns `SinglePassMode = true` without reflection or reader abstraction.
-     - Runtime harness V2: passed; Release executable started, exposed its main window, closed cleanly through `CloseMainWindow()`, and exited with code 0 without forced termination.
-     - Workbook comparison: pending manual observation by the user with the same private workbook; no performance improvement was measured or claimed here.
-     - Rollback boundary: revert the single-pass header-reader configuration, its focused seam test, and V2L-008 documentation only; header presentation, plan behavior, UI, and future cleaning semantics remain unchanged.
-     - RDD risk: `disabled/unmanaged`.
-     - Commit: the single work-unit commit is `perf(v2): read workbook headers in single pass`.
-     - Next step: the user compares speed manually with the same workbook; before future cleaning execution, headers will be re-read and compared, but that behavior is not implemented now.
+  - Evidence:
+    - `dotnet build V2/PapaPersonas.sln -c Release --no-restore`: passed; 0 warnings, 0 errors.
+    - `dotnet test V2/PapaPersonas.sln -c Release --no-build`: passed; 8 passed, 0 failed, 0 skipped.
+    - Readback: `ExcelDataReaderHeaderReader` passes `HeaderReaderConfiguration.Create()` to `CreateReader`; that configuration sets `SinglePassMode = true`. Header discovery calls `Read()` once, uses the resulting `FieldCount`, preserves raw value order and positional normalization, and does not use `RowCount`.
+    - Configuration seam test: passed; the productive configuration factory returns `SinglePassMode = true` without reflection or reader abstraction.
+    - Runtime harness V2: passed; Release executable started, exposed its main window, closed cleanly through `CloseMainWindow()`, and exited with code 0 without forced termination.
+    - Workbook comparison: pending manual observation by the user with the same private workbook; no performance improvement was measured or claimed here.
+    - Rollback boundary: revert the single-pass header-reader configuration, its focused seam test, and V2L-008 documentation only; header presentation, plan behavior, UI, and future cleaning semantics remain unchanged.
+    - RDD risk: `disabled/unmanaged`; automated assessment classified the small executable configuration change as medium.
+    - Commit: `37d7941` (`perf(v2): read workbook headers in single pass`).
+    - Parent spot check: `dotnet test V2/PapaPersonas.sln -c Release --no-build` passed again with 8 passed, 0 failed, and 0 skipped.
+    - Next step: the user compares speed manually with the same workbook; before future cleaning execution, headers will be re-read and compared, but that behavior is not implemented now.
+
+- [ ] **V2L-009 — Keep tabular input extensible to CSV**
+  - Status: future architecture note only; not authorized for implementation.
+  - Scope: evolve the source boundary so UI, header snapshots, cleaning plans, and future row processing depend on a tabular-source contract rather than an Excel-only implementation. Select the concrete reader by file type (`.xlsx`/`.xls` or `.csv`).
+  - CSV considerations: use `CreateCsvReader`, bound initial analysis (for example `AnalyzeInitialCsvRows = 1` for header-only discovery), and explicitly handle delimiter candidates, BOM/fallback encoding, quoted values, and escaping. `SinglePassMode` applies to XLS/XLSX/XLSB and has no effect on CSV.
+  - Acceptance: adding CSV later does not change cleaning-plan semantics or UI state; Excel and CSV readers produce the same raw ordered header snapshot and row contract.
+  - Evidence: pending.
 
 ## Confirmed Future Cleaning Semantics
 
@@ -184,4 +192,4 @@ The current application contains a cumulative master-database workflow that is n
 
 ## Progress and Next Step
 
-`V2L-001` through `V2L-007` are complete. The next authorized work unit is V2L-008 single-pass header discovery. The ordered plan still awaits manual review; TXT log export and cleaning execution remain future tasks.
+`V2L-001` through `V2L-008` are complete. The user must compare single-pass speed with the same workbook and continue visual review of the ordered plan. CSV extensibility, TXT log export, and cleaning execution remain future work requiring explicit authorization.
