@@ -1,0 +1,23 @@
+<Window x:Class="PapaPersonas.V2.App.CompletionDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Proceso completado" Height="250" Width="560"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        ShowInTaskbar="False">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <TextBlock FontSize="18" FontWeight="SemiBold" Text="Archivos generados correctamente" />
+        <StackPanel Grid.Row="1" Margin="0,14,0,14">
+            <TextBlock Text="Archivo limpio:" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding CleanOutputPath}" TextWrapping="Wrap" AutomationProperties.Name="Ruta del archivo limpio" />
+            <TextBlock Margin="0,10,0,0" Text="Archivo de rechazados:" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding RejectedOutputPath}" TextWrapping="Wrap" AutomationProperties.Name="Ruta del archivo de rechazados" />
+        </StackPanel>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="OpenFolderButton" Width="120" Margin="0,0,8,0" Content="Abrir carpeta" IsDefault="True" Click="OpenFolderButton_OnClick" />
+            <Button Width="90" Content="Aceptar" IsCancel="True" Click="AcceptButton_OnClick" />
+        </StackPanel>
+    </Grid>
+</Window>

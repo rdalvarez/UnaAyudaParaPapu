@@ -11,7 +11,10 @@ public partial class MainWindow : Window
     private readonly IHeaderReader _headerReader = new ExcelDataReaderHeaderReader();
     private readonly ActivityLog _activityLog = new();
     private readonly CleaningPlan _cleaningPlan = new();
+    private readonly CleaningExecutionCoordinator _executionCoordinator = new();
     private string? _rejectedFolderPath;
+    private IReadOnlyList<string?> _rawHeaders = [];
+    private bool _isBusy;
 
     public MainWindow()
     {
@@ -58,19 +61,21 @@ public partial class MainWindow : Window
 
         try
         {
-            SetBusy(true);
+            SetBusy(true, "Leyendo encabezados...");
             var path = dialog.FileName;
             var rejectedFolder = RejectedFolderPolicy.GetDefault(path);
-            var columns = await Task.Run(() =>
+            var rawHeaders = await Task.Run(() =>
             {
                 Directory.CreateDirectory(rejectedFolder);
-                return HeaderPresentation.Normalize(_headerReader.ReadHeaders(path));
+                return _headerReader.ReadHeaders(path).ToArray();
             });
+            var columns = HeaderPresentation.Normalize(rawHeaders);
 
             InputFileTextBox.Text = path;
             RejectedFolderTextBox.Text = rejectedFolder;
             _rejectedFolderPath = rejectedFolder;
             ResetCleaningPlan();
+            _rawHeaders = rawHeaders;
             SetColumns(columns);
             AddActivity($"Archivo seleccionado: {Path.GetFileName(path)}");
             AddActivity($"Carpeta de rechazados: {rejectedFolder}");
@@ -123,9 +128,11 @@ public partial class MainWindow : Window
         UpdateCleaningControls();
     }
 
-    private void SetBusy(bool isBusy)
+    private void SetBusy(bool isBusy, string? status = null)
     {
-        HeaderReadingProgressPanel.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
+        _isBusy = isBusy;
+        OperationProgressPanel.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
+        if (status is not null) OperationStatusTextBlock.Text = status;
         BrowseFileButton.IsEnabled = !isBusy;
         BrowseFolderButton.IsEnabled = !isBusy;
         RejectedFolderLabel.IsEnabled = !isBusy;
@@ -166,6 +173,7 @@ public partial class MainWindow : Window
         var removed = _cleaningPlan.Clear();
         DuplicateColumnComboBox.SelectedItem = null;
         EmptyColumnComboBox.SelectedItem = null;
+        _rawHeaders = [];
         RefreshCleaningPlanPresentation();
         if (removed > 0)
         {
@@ -185,12 +193,55 @@ public partial class MainWindow : Window
 
     private void UpdateCleaningControls()
     {
-        var isBusy = HeaderReadingProgressPanel.Visibility == Visibility.Visible;
+        var isBusy = _isBusy;
         DuplicateColumnComboBox.IsEnabled = !isBusy && DuplicateColumnComboBox.Items.Count > 0;
         EmptyColumnComboBox.IsEnabled = !isBusy && EmptyColumnComboBox.Items.Count > 0;
         RemoveDuplicatesButton.IsEnabled = !isBusy && DuplicateColumnComboBox.SelectedItem is DetectedColumn;
         RemoveEmptyValuesButton.IsEnabled = !isBusy && EmptyColumnComboBox.SelectedItem is DetectedColumn;
         ClearCleaningPlanButton.IsEnabled = !isBusy && _cleaningPlan.Steps.Count > 0;
+        GenerateOutputButton.IsEnabled = !isBusy &&
+            !string.IsNullOrWhiteSpace(InputFileTextBox.Text) && File.Exists(InputFileTextBox.Text) &&
+            !string.IsNullOrWhiteSpace(_rejectedFolderPath) && _rawHeaders.Count > 0 && _cleaningPlan.Steps.Count > 0;
+    }
+
+    private async void GenerateOutputButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (_isBusy || string.IsNullOrWhiteSpace(InputFileTextBox.Text) ||
+            string.IsNullOrWhiteSpace(_rejectedFolderPath) || _rawHeaders.Count == 0 || _cleaningPlan.Steps.Count == 0)
+            return;
+
+        var inputPath = InputFileTextBox.Text;
+        var rejectedFolderPath = _rejectedFolderPath;
+        var rawHeaders = _rawHeaders.ToArray();
+        var visibleSteps = _cleaningPlan.Steps.ToArray();
+        AddActivity($"Validando plan: {visibleSteps.Length} pasos recibidos.");
+        SetBusy(true, "Procesando archivo...");
+        CycleSummaryTextBlock.Text = "Procesando archivo...";
+        try
+        {
+            var result = await Task.Run(() => _executionCoordinator.Execute(
+                new CleaningExecutionRequest(inputPath, rejectedFolderPath, rawHeaders, visibleSteps)));
+            foreach (var omitted in result.OmittedSteps)
+                AddActivity($"Paso omitido: {omitted.Step.VisibleDescription}. Razón: {omitted.Reason}.");
+            foreach (var cycle in result.Cycles)
+                AddActivity($"Ciclo {cycle.StepNumber}: {cycle.Action} por {cycle.ColumnName}; entrada {cycle.InputRows}, rechazadas {cycle.RejectedRows}, restantes {cycle.RemainingRows}.");
+            AddActivity($"Total rechazado: {result.TotalRejectedRows}. Total restante: {result.RemainingRows}.");
+            AddActivity($"Salida limpia: {result.CleanOutputPath}");
+            AddActivity($"Salida de rechazados: {result.RejectedOutputPath}");
+            if (result.CleanupWarning is not null) AddActivity($"Advertencia de limpieza temporal: {result.CleanupWarning}");
+            CycleSummaryTextBlock.Text = $"Proceso completado. Rechazadas: {result.TotalRejectedRows}. Restantes: {result.RemainingRows}.";
+            new CompletionDialog(result, inputPath) { Owner = this }.ShowDialog();
+        }
+        catch (Exception exception)
+        {
+            AddActivity($"Error al procesar el archivo: {exception.Message}");
+            CycleSummaryTextBlock.Text = $"Falló el procesamiento. {exception.Message}";
+            System.Windows.MessageBox.Show(this, $"No se pudo procesar el archivo.\n\nDetalle técnico: {exception.Message}\n\nSi el libro cambió, vuelva a seleccionarlo y recargue sus encabezados. No se reintentará automáticamente.", "No se pudo generar el archivo", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
     }
 
     private void AddActivity(string message)

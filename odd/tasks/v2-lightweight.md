@@ -257,10 +257,18 @@ The current application contains a cumulative master-database workflow that is n
     - RDD risk: `disabled/unmanaged`.
     - Commit: `feat(v2): orchestrate cleaning output publication` (this work-unit commit).
 
-- [ ] **V2L-015 — Wire execution progress and completion UI**
-  - Status: future implementation task after V2L-014 verification.
+- [x] **V2L-015 — Wire execution progress and completion UI**
+  - Status: complete; Solapa 1 now connects to the verified V2L-014 coordinator.
   - Scope: enable generation only for a valid input, output folder, and non-empty plan; run asynchronously with the existing busy guard; render validation/cycle/output logs; and show a final custom dialog with `Abrir carpeta` (opens the source folder) and `Aceptar`.
-  - Evidence: pending.
+  - Evidence:
+    - `dotnet build V2/PapaPersonas.sln -c Release --no-restore`: pending in this work unit; required verification command below.
+    - `dotnet test V2/PapaPersonas.sln -c Release --no-build`: pending in this work unit; required verification command below.
+    - Structural readback: raw header snapshots are copied before normalization; Generate is enabled only for valid input, rejected folder, raw headers, and a non-empty visible plan; one busy guard disables selection, plan mutation, actions, and generation; execution snapshots paths/headers/steps and uses `Task.Run`; logs include omitted steps, cycles, counts, full output paths, and cleanup warnings; errors reset busy state in `finally` and instruct reload/reselection without retry.
+    - Completion dialog is owner-centered, accessible, keyboard-default/cancel aware, and opens only the original source directory with `UseShellExecute = true`; open failures show a friendly message without crashing.
+    - Runtime harness: bounded launch/close only; visual acceptance and manual representative-workbook execution remain for the operator.
+    - Rollback boundary: revert `V2/src/PapaPersonas.V2.App/MainWindow.xaml`, `MainWindow.xaml.cs`, `CompletionDialog.xaml`, `CompletionDialog.xaml.cs`, `V2/README.md`, and this V2L-015 evidence; V2L-014 engine and earlier V2 work remain outside the boundary.
+    - RDD risk: `disabled/unmanaged`.
+    - Commit: pending until verification (`feat(v2): connect cleaning workflow UI`).
 
 ## Confirmed Future Cleaning Semantics
 
@@ -273,4 +281,4 @@ The current application contains a cumulative master-database workflow that is n
 
 ## Progress and Next Step
 
-`V2L-001` through `V2L-008` and V2L-010/V2L-013 are complete and the single-pass speed improvement is manually accepted. V2L-012 staging and V2L-013 cleaning are disconnected; V2L-014 is next for publication orchestration, followed by V2L-015 UI wiring. Source-format extensibility and TXT log export remain future work.
+`V2L-001` through `V2L-008`, V2L-010 through V2L-015 are complete and the single-pass speed improvement is manually accepted. The next step is a manual smoke with a representative workbook, followed only by explicitly authorized fixes. TXT export and CSV/TXT input remain future work.

@@ -16,7 +16,7 @@
         <Border Padding="12" CornerRadius="8" BorderBrush="#FFE6E6E6" BorderThickness="1" Background="#FFFDFDFD">
             <StackPanel>
                 <TextBlock FontSize="24" FontWeight="Bold" Text="PapaPersonas V2" />
-                <TextBlock Margin="0,4,0,0" Foreground="#FF666666" Text="Shell visual — Solapa 1 en preparación" />
+                <TextBlock Margin="0,4,0,0" Foreground="#FF666666" Text="Preparación y limpieza de archivos Excel" />
             </StackPanel>
         </Border>
 
@@ -31,7 +31,7 @@
                     <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
                         <StackPanel Margin="0,0,6,0">
                             <TextBlock FontSize="18" FontWeight="SemiBold" Text="Preparar archivo de Hernán" />
-                            <TextBlock Margin="0,4,0,14" Foreground="#FF666666" Text="La selección de archivo y la lectura de encabezados están disponibles. La limpieza, exportación y persistencia todavía no." TextWrapping="Wrap" />
+                            <TextBlock Margin="0,4,0,14" Foreground="#FF666666" Text="Seleccione un archivo, arme el plan de limpieza y genere los archivos de salida. La exportación TXT, las fuentes CSV y la persistencia siguen fuera de alcance." TextWrapping="Wrap" />
 
                             <GroupBox Header="Archivos" Padding="10">
                                 <Grid>
@@ -46,17 +46,18 @@
                                 </Grid>
                             </GroupBox>
 
-                            <StackPanel x:Name="HeaderReadingProgressPanel"
+                            <StackPanel x:Name="OperationProgressPanel"
                                         Margin="0,12,0,0"
                                         Visibility="Collapsed"
-                                        AutomationProperties.Name="Estado de lectura de encabezados"
+                                        AutomationProperties.Name="Estado de la operación"
                                         AutomationProperties.LiveSetting="Polite">
-                                <TextBlock Text="Leyendo encabezados..."
-                                           AutomationProperties.Name="Leyendo encabezados" />
+                                <TextBlock x:Name="OperationStatusTextBlock"
+                                           Text="Leyendo encabezados..."
+                                           AutomationProperties.Name="Estado de la operación" />
                                 <ProgressBar Margin="0,6,0,0"
                                              Height="8"
                                              IsIndeterminate="True"
-                                             AutomationProperties.Name="Progreso de lectura de encabezados" />
+                                             AutomationProperties.Name="Progreso de la operación" />
                             </StackPanel>
 
                             <GroupBox Header="Columnas detectadas" Padding="10" Margin="0,12,0,0">
@@ -86,9 +87,9 @@
                             <TextBlock x:Name="CleaningPlanSummaryTextBlock" Margin="0,4,0,0" Foreground="#FF666666" Text="Plan vacío." />
 
                             <GroupBox Header="Resumen y estado del ciclo" Padding="10" Margin="0,12,0,0">
-                                <TextBlock Text="Sin ciclo iniciado. No se han leído ni modificado archivos." TextWrapping="Wrap" />
+                                <TextBlock x:Name="CycleSummaryTextBlock" Text="Sin ciclo iniciado. No se han leído ni modificado archivos." TextWrapping="Wrap" />
                             </GroupBox>
-                            <Button Margin="0,12,0,0" HorizontalAlignment="Left" Width="220" Content="Generar archivo de salida" IsEnabled="False" />
+                            <Button x:Name="GenerateOutputButton" Margin="0,12,0,0" HorizontalAlignment="Left" Width="220" Content="Generar archivo de salida" Click="GenerateOutputButton_OnClick" AutomationProperties.Name="Generar archivo de salida" />
                         </StackPanel>
                     </ScrollViewer>
                     <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Center" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" Background="#FFDDDDDD" />
@@ -103,7 +104,7 @@
         </TabControl>
 
         <Border Grid.Row="4" Padding="8" CornerRadius="6" BorderBrush="#FFE0E0E0" BorderThickness="1" Background="#FFF9F9F9">
-            <TextBlock Text="Selección de archivo y lectura de encabezados disponibles. Limpieza, exportación y persistencia todavía no." TextWrapping="Wrap" />
+            <TextBlock Text="La limpieza de la Solapa 1 está conectada. TXT, CSV/TXT de entrada, Sergio, Stock, Consultas y persistencia permanecen fuera de alcance." TextWrapping="Wrap" />
         </Border>
     </Grid>
 </Window>
