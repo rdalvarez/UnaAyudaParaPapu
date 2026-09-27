@@ -34,7 +34,7 @@ public sealed class StreamingCsvWriter : IDisposable
 
     private static string Escape(string value)
     {
-        var requiresQuotes = value.Contains(',') ||
+        var requiresQuotes = value.Length == 0 || value.Contains(',') ||
             value.Contains('"') ||
             value.Contains('\r') ||
             value.Contains('\n') ||

@@ -229,12 +229,20 @@ The current application contains a cumulative master-database workflow that is n
     - Commit placeholder/identity: this work-unit commit (`feat(v2): stage workbook rows for cleaning`).
     - Route: rollback by reverting the single work-unit commit; no remote operation requested or performed.
 
-- [ ] **V2L-013 — Apply cleaning cycles and consolidate rejections**
-  - Status: future implementation task after V2L-012 verification.
+- [x] **V2L-013 — Apply cleaning cycles and consolidate rejections**
+  - Status: complete; pure workspace processor remains disconnected from UI/publication.
   - Scope: consume `current.csv`, apply each normalized cycle in order through next-file replacement, and build one rejected CSV. No DuckDB and no whole-file row materialization.
   - Rejected output metadata columns appear first: `PP_MOTIVO`, `PP_PASO`, `PP_COLUMNA`, `PP_VALOR`, followed by every original column in order; source headers colliding with technical names receive deterministic suffixes.
   - Duplicate semantics: compare trimmed non-empty values case-insensitively; reject every row in repeated groups. Empty semantics: trim the selected value and reject when empty.
-  - Evidence: pending.
+  - Evidence:
+    - Release build passed with 0 warnings and 0 errors.
+    - Complete Release test suite passed with 30 tests, 0 failures, and 0 skips.
+    - Structural readback: streaming cycle passes replace `next.csv` safely, keep only the active duplicate-count map, validate headers/row widths, preserve complete first-rejection rows, and write one header-only rejected file when needed. No UI, publication, cleanup orchestration, DuckDB, or V1 code changed.
+    - Focused tests cover empty/duplicate semantics, sequential survivors, consolidated output, deterministic technical-header collisions, malformed transport cleanup, single-column empty rows, counters, and ordering. Tests use explicit temporary roots only; production LocalAppData is never used.
+    - Runtime harness: `N/A` — intentionally disconnected from UI; focused tests are the applicable boundary.
+    - Rollback boundary: revert the V2L-013 processor, transport regression fix, focused tests, README, and this evidence only.
+    - RDD risk: `disabled/unmanaged`.
+    - Commit: this work-unit commit (`feat(v2): process streaming cleaning cycles`).
 
 - [ ] **V2L-014 — Orchestrate cleanup and publish outputs safely**
   - Status: future implementation task after V2L-013 verification.
@@ -257,4 +265,4 @@ The current application contains a cumulative master-database workflow that is n
 
 ## Progress and Next Step
 
-`V2L-001` through `V2L-008` and V2L-010/V2L-012 are complete and the single-pass speed improvement is manually accepted. V2L-012 staging is disconnected; V2L-013 applies cleaning, V2L-014 publishes safely, and V2L-015 wires the UI. Source-format extensibility and TXT log export remain future work.
+`V2L-001` through `V2L-008` and V2L-010/V2L-013 are complete and the single-pass speed improvement is manually accepted. V2L-012 staging and V2L-013 cleaning are disconnected; V2L-014 is next for publication orchestration, followed by V2L-015 UI wiring. Source-format extensibility and TXT log export remain future work.

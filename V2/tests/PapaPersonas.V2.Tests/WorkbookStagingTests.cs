@@ -13,7 +13,7 @@ public sealed class WorkbookStagingTests
         var result = Stage(cursor, ["A", "B"]);
 
         Assert.Equal(2, result.DataRowCount);
-        Assert.Equal(["A,B", "1,two", "3,"], ReadRows(result.StagedPath));
+        Assert.Equal(["A,B", "1,two", "3,\"\""], ReadRows(result.StagedPath));
     }
 
     [Fact]
