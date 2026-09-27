@@ -59,18 +59,21 @@ Sergio workbooks can contain empty or repeated headers. Persisting those headers
   - RDD: disabled/unmanaged.
   - Commits: `c764557` (`feat(v2): validate sergio staging load`), `140b319` (`docs(v2): document sergio staging readiness`), and `2464efa` (`fix(v2): honor accepted sergio aliases`).
 
-- [ ] **SER-004 — Preview and atomically promote the valid Sergio candidate**
+- [x] **SER-004 — Preview and atomically promote the valid Sergio candidate**
   - Route: delegated direct because DuckDB promotion, ownership, WPF preview/confirmation, integration tests, and documentation span multiple non-trivial files.
   - Delivery: `stacked-to-main`, selected by the maintainer after the cohesive implementation forecast exceeded 400 authored lines. Slice 1 is the independently testable promotion backend; slice 2 is WPF integration and documentation.
-  - Status: ready for slice 1 after SER-003 verification.
+  - Status: complete after SER-004A and SER-004B checks.
   - Scope: show bounded preview and replacement warning, then atomically replace the single official Sergio table and update last-file/load-time metadata. Preserve the previous official execution on any failure.
   - [x] **SER-004A — Add atomic promotion backend, metadata, preview, and integration tests**
      - Evidence: `SergioLoadPromoter` previews only analyzer-owned candidates with schema-order aliases, at most 20 rows, VARCHAR/null values, total count, basename-only source metadata, and prior official metadata. Promotion serializes with analyzer operations, revalidates ownership/existence/schema, transactionally drops/renames `sergio_current`, writes the one-row `sergio_load_metadata`, and releases ownership only after commit. Identifier quoting is centralized and metadata values are parameterized; full input paths and row values are not persisted or logged. Integration tests cover bounded preview/null preservation, first load and replacement, unknown candidate rejection, unrelated-table preservation, cleanup safety, and candidate retryability. Rollback is covered twice: `FailureAfterReplacementRollsBackAndCandidateRemainsRetryable` uses the retained artificial post-replacement fault hook, while `RealMetadataSchemaFailureRollsBackReplacementAndAllowsRetryAfterRepair` prepares a consultable previous official/metadata state with a deliberately incompatible real metadata schema, verifies DuckDB fails during metadata INSERT after replacement and metadata DELETE, asserts both previous values, the analyzer-owned candidate, and an unrelated table survive rollback, repairs the schema, and verifies retry success. Verification: `dotnet build V2/PapaPersonas.sln -c Release --no-restore`; `dotnet test V2/PapaPersonas.sln -c Release --no-build` (72/72); `git diff --check`; structural readback confirmed transactional rename/metadata, ownership serialization/release, no full paths/PII, and no WPF/V1 changes. Runtime GUI smoke: N/A because this slice has no UI change.
     - Rollback: revert the backend/test changes and this evidence entry; no official-table migration is required because promotion is transactional.
     - RDD: disabled/unmanaged.
-  - [ ] **SER-004B — Add WPF preview/confirmation flow and close documentation**
-  - Evidence: pending.
+   - [x] **SER-004B — Add WPF preview/confirmation flow and close documentation**
+     - Evidence: WPF exposes `Vista previa y cargar` only for a valid owned candidate. It asynchronously obtains one bounded backend preview without rereading Excel, then opens one owner-centered modal dialog with basename-only metadata, row count, selected PK, prior metadata, dynamic schema-order columns, at most 20 rows, a replacement warning, and exact semantic `Cancelar`, `Cargar`, or `Reemplazar` action. Cancel performs no mutation; promotion occurs only after confirmation. Promotion failure keeps the candidate retryable and does not claim replacement; success releases UI ownership without drop, records basename/row count/local timestamp without values or full paths, and disables double promotion. File/PK changes retain SER-003 cleanup behavior; close after success never cleans official data. Focused text-state test added. Verification: Release build without restore, full V2 tests without build, `git diff --check`, and structural readback passed. Runtime GUI smoke: N/A/not run in this environment; no visual acceptance claimed.
+     - Rollback: revert the WPF preview dialog, shell text model, MainWindow integration, focused test, README, and this evidence entry; backend SER-004A remains independently usable.
+     - RDD: disabled/unmanaged.
+     - Commits: backend `1584382`, backend verification `37a8015`, UI commit recorded after creation.
 
 ## Progress
 
-SER-001 and SER-002 are complete. SER-003 implementation was initially independently blocked, then corrected and tested; verification checks pass and SER-003 is complete. RDD remains disabled/unmanaged. SER-004 will preview and atomically replace the prior official execution only after separate confirmation.
+SER-001 through SER-004 are complete after their recorded checks. RDD remains disabled/unmanaged. SER-004 uses explicit confirmation before atomically replacing the prior official execution.

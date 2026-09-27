@@ -8,6 +8,18 @@ namespace PapaPersonas.V2.Tests;
 public sealed class SergioStagingTests
 {
     [Fact]
+    public void PreviewTextDistinguishesFirstLoadAndReplacement()
+    {
+        var first = new SergioPreview(["CUIL"], [], 2, "CUIL", "first.xlsx", false, null);
+        var replacement = first with { PreviousOfficialExists = true, PreviousMetadata = new SergioLoadMetadata("old.xlsx", DateTime.UtcNow, 1, "CUIL", null) };
+
+        Assert.Equal("Cargar", SergioLoadPreviewText.Action(first));
+        Assert.Equal("Reemplazar", SergioLoadPreviewText.Action(replacement));
+        Assert.Contains("sergio_current", SergioLoadPreviewText.Warning(replacement));
+        Assert.DoesNotContain("reemplazará", SergioLoadPreviewText.Warning(first));
+    }
+
+    [Fact]
     public void FormatterPreservesStringsAndUsesDeterministicText()
     {
         Assert.Equal("1", SergioCellTextFormatter.Format(1.0));
