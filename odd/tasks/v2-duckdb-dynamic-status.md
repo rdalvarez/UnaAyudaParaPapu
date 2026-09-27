@@ -28,7 +28,7 @@ V2 currently creates DuckDB only when a Sergio workbook is analyzed, while the f
 - Reloading a workbook may rebuild missing dynamic tables when DuckDB remains writable; it cannot repair a corrupt, locked, permission-denied, or storage-failed database.
 - TDD mode: off; ordinary behavior-first integration tests and Release build are required.
 - Delivery strategy: `stacked-to-main`; each task is an ordered local commit. No push or PR creation is authorized.
-- Forecast: under 400 authored changed lines, excluding tests only when generated; no PR split is expected.
+- Initial forecast: under 400 authored changed lines; actual scope is recorded below without code-golfing or omitted tests.
 
 ## Tasks
 
@@ -50,7 +50,11 @@ Feature authorized. Exploration confirmed that V2 has no startup database bootst
 
 DDS-001 implemented in `feat/v2-lightweight` with a dedicated lifecycle backend service and focused integration tests. Metadata initialization is idempotent, inspection reports ready/loaded/inconsistent/unavailable states without mutating business tables, and reset requires explicit confirmation while preserving collision-safe backups and rollback restoration on initialization failure.
 
+DDS-001 work-unit commit: `aa23b06` (`feat(v2): initialize and inspect duckdb lifecycle`). RDD was disabled/unmanaged; parent structural readback and focused test rerun passed.
+
 DDS-002 implemented by wiring asynchronous lifecycle initialization/inspection into WPF startup, replacing the static footer text with a compact dynamic DuckDB status area, adding guarded reset confirmation/action, and refreshing footer state after Sergio promotion completion (success and failure) and after reset.
+
+DDS-002 work-unit commit: `e811cfe` (`feat(v2): show dynamic duckdb status in footer`). Native assessment was high due to a conservative process-boundary signal; independent read-only verification found no process mutation and passed all required checks. RDD remained disabled/unmanaged.
 
 ## Evidence
 
@@ -65,4 +69,4 @@ DDS-002 implemented by wiring asynchronous lifecycle initialization/inspection i
 
 ## Forecast update
 
-Original forecast (<400 authored lines) is exceeded across DDS-001 + DDS-002 combined. The work was kept as two cohesive ODD work-unit commits instead of code-golfing or omitting tests.
+Original forecast (<400 authored lines) was exceeded: DDS-001 authored `+886/-2` and DDS-002 authored `+367/-4` (combined `+1253/-6`, including tests and task evidence). The work was kept as two cohesive ODD work-unit commits instead of code-golfing or omitting tests. No push or pull request was created.
