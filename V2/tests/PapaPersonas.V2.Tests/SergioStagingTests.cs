@@ -127,21 +127,29 @@ public sealed class SergioStagingTests
     }
 
     [Fact]
-    public void DuplicateTrimmedKeyLeavesNoCandidateAndPreservesUnrelatedTable()
+    public void MixedKeysRetainEveryRowAndClassifyRejections()
     {
         using var workspace = new TestWorkspace();
         using (var connection = Open(workspace.DatabasePath))
         using (var command = connection.CreateCommand()) { command.CommandText = "CREATE TABLE unrelated(value VARCHAR)"; command.ExecuteNonQuery(); }
-        var workbook = workspace.CreateWorkbook(["CUIL"], [" 20-1 ", "20-1"]);
+        var workbook = workspace.CreateWorkbook(["CUIL"], [" 20-1 ", "20-1", "", "  ", "20-2"]);
         var headers = SergioHeaderPreflight.Analyze(["CUIL"]);
         var analyzer = new SergioStagingAnalyzer(new DuckDbPathPolicy(workspace.DatabasePath));
 
         var result = analyzer.Analyze(new SergioStagingRequest(workbook, headers, "CUIL"));
 
         Assert.False(result.IsValid);
-        Assert.Equal(string.Empty, result.CandidateTableName);
+        Assert.Equal(1, result.ValidRows);
+        Assert.Equal(2, result.EmptyPrimaryKeyRows);
+        Assert.Equal(1, result.DuplicateGroups);
+        Assert.Equal(2, result.DuplicateRows);
+        Assert.Equal(5, result.TotalRows);
         using var verify = Open(workspace.DatabasePath);
         Assert.True(TableExists(verify, "unrelated"));
+        Assert.Equal(5, CountRows(verify, result.CandidateTableName));
+        Assert.Equal(2, CountReason(verify, result.CandidateTableName, result.TechnicalReasonColumnName, "CLAVE_VACIA"));
+        Assert.Equal(2, CountReason(verify, result.CandidateTableName, result.TechnicalReasonColumnName, "CLAVE_DUPLICADA"));
+        analyzer.Cleanup(result.CandidateTableName);
     }
 
     [Fact]
@@ -258,6 +266,7 @@ public sealed class SergioStagingTests
     private static DuckDBConnection Open(string path) { var connection = new DuckDBConnection(new DuckDBConnectionStringBuilder { DataSource = path }.ConnectionString); connection.Open(); return connection; }
     private static bool TableExists(DuckDBConnection connection, string name) { using var command = connection.CreateCommand(); command.CommandText = "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?"; command.Parameters.Add(new DuckDBParameter { Value = name }); return Convert.ToInt64(command.ExecuteScalar()) > 0; }
     private static long CountRows(DuckDBConnection connection, string table) { using var command = connection.CreateCommand(); command.CommandText = $"SELECT COUNT(*) FROM \"{table}\""; return Convert.ToInt64(command.ExecuteScalar()); }
+    private static long CountReason(DuckDBConnection connection, string table, string column, string reason) { using var command = connection.CreateCommand(); command.CommandText = $"SELECT COUNT(*) FROM \"{table}\" WHERE \"{column}\" = ?"; command.Parameters.Add(new DuckDBParameter { Value = reason }); return Convert.ToInt64(command.ExecuteScalar()); }
     private static string ReadValue(DuckDBConnection connection, string table, string column = "value") { using var command = connection.CreateCommand(); command.CommandText = $"SELECT \"{column}\" FROM \"{table}\" LIMIT 1"; return (string)command.ExecuteScalar()!; }
     private static (string CandidateTableName, string Workbook) Stage(TestWorkspace workspace, SergioStagingAnalyzer analyzer, string fileName, string value)
     {

@@ -37,9 +37,10 @@ public sealed class SergioLoadPromoter
         using var connection = Open(analyzer.DatabasePath);
         EnsureOwnedCandidate(connection, candidateTableName, selectedPrimaryKeyAlias, out var aliases);
         var rows = new List<IReadOnlyList<string?>>();
+        var businessProjection = string.Join(", ", aliases.Select(SergioSql.Quote));
         using (var command = connection.CreateCommand())
         {
-            command.CommandText = $"SELECT * FROM {SergioSql.Quote(candidateTableName)} LIMIT 20";
+            command.CommandText = $"SELECT {businessProjection} FROM {SergioSql.Quote(candidateTableName)} LIMIT 20";
             using var reader = command.ExecuteReader();
             while (reader.Read())
             {
@@ -64,7 +65,9 @@ public sealed class SergioLoadPromoter
             EnsureOwnedCandidate(connection, candidateTableName, selectedPrimaryKeyAlias, out var aliases, transaction);
             if (TableExists(connection, OfficialTableName, transaction))
                 Execute(connection, transaction, $"DROP TABLE {SergioSql.Quote(OfficialTableName)}");
-            Execute(connection, transaction, $"ALTER TABLE {SergioSql.Quote(candidateTableName)} RENAME TO {SergioSql.Quote(OfficialTableName)}");
+            var businessProjection = string.Join(", ", aliases.Select(SergioSql.Quote));
+            Execute(connection, transaction, $"CREATE TABLE {SergioSql.Quote(OfficialTableName)} AS SELECT {businessProjection} FROM {SergioSql.Quote(candidateTableName)}");
+            Execute(connection, transaction, $"DROP TABLE {SergioSql.Quote(candidateTableName)}");
             afterOfficialReplacement?.Invoke();
             Execute(connection, transaction, $"CREATE TABLE IF NOT EXISTS {SergioSql.Quote(MetadataTableName)} (source_file_name VARCHAR, loaded_at_utc TIMESTAMP, row_count BIGINT, selected_primary_key_alias VARCHAR, schema_version VARCHAR)");
             Execute(connection, transaction, $"DELETE FROM {SergioSql.Quote(MetadataTableName)}");
@@ -89,6 +92,11 @@ public sealed class SergioLoadPromoter
             throw new InvalidOperationException("The Sergio candidate is unknown or not owned by this analyzer.");
         aliases = ReadColumns(connection, candidate, transaction);
         if (!aliases.Contains(key, StringComparer.Ordinal)) throw new InvalidOperationException("The selected Sergio primary key is not in the candidate schema.");
+        var technical = aliases.FirstOrDefault(alias => alias.StartsWith("__pp_motivo_rechazo", StringComparison.Ordinal));
+        if (technical is null) throw new InvalidOperationException("The Sergio candidate has no rejection classification column.");
+        if (Scalar(connection, $"SELECT COUNT(*) FROM {SergioSql.Quote(candidate)} WHERE {SergioSql.Quote(technical)} IS NOT NULL", transaction) != 0)
+            throw new InvalidOperationException("The Sergio candidate contains rejected rows and cannot be promoted.");
+        aliases = aliases.Where(alias => !string.Equals(alias, technical, StringComparison.Ordinal)).ToArray();
     }
 
     private static IReadOnlyList<string> ReadColumns(DuckDBConnection c, string table, DuckDBTransaction? tx)

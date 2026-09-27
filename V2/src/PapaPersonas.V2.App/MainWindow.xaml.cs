@@ -270,10 +270,10 @@ public partial class MainWindow : Window
         try
         {
             var result = await Task.Run(() => _sergioAnalyzer.Analyze(request));
-            _sergioCandidateTable = result.IsValid ? result.CandidateTableName : null;
-            SergioSummaryTextBlock.Text = $"Filas: {result.TotalRows}. Clave vacía: {result.EmptyPrimaryKeyRows}. Grupos duplicados: {result.DuplicateGroups}. Filas duplicadas: {result.DuplicateRows}. Estado: {(result.IsValid ? "válido; listo para una confirmación futura" : "inválido; no se retuvo candidato")}.";
-            AddActivity("Paso 2", $"Validación Sergio: filas {result.TotalRows}, vacías {result.EmptyPrimaryKeyRows}, grupos duplicados {result.DuplicateGroups}, filas duplicadas {result.DuplicateRows}, candidato {(result.IsValid ? "disponible" : "ninguno")}.");
-            if (!result.IsValid) System.Windows.MessageBox.Show(this, "La clave primaria contiene valores vacíos o duplicados. No se retuvo ninguna tabla candidata.", "Carga de Sergio inválida", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _sergioCandidateTable = result.CandidateTableName;
+            SergioSummaryTextBlock.Text = $"Filas: {result.TotalRows}. Válidas: {result.ValidRows}. Clave vacía: {result.EmptyPrimaryKeyRows}. Grupos duplicados: {result.DuplicateGroups}. Filas duplicadas: {result.DuplicateRows}. Estado: {(result.IsValid ? "válido; listo para una confirmación futura" : "con rechazos; no se puede promover aún")}.";
+            AddActivity("Paso 2", $"Validación Sergio: filas {result.TotalRows}, válidas {result.ValidRows}, vacías {result.EmptyPrimaryKeyRows}, grupos duplicados {result.DuplicateGroups}, filas duplicadas {result.DuplicateRows}, candidato retenido.");
+            if (!result.IsValid) System.Windows.MessageBox.Show(this, "La clave primaria contiene valores vacíos o duplicados. El candidato se retuvo para revisión, pero no puede promoverse todavía.", "Carga de Sergio con rechazos", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         catch (Exception exception)
         {

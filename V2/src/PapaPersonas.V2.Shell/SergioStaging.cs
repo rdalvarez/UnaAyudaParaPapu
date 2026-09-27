@@ -37,11 +37,15 @@ public sealed record SergioStagingResult(
     string CandidateTableName,
     IReadOnlyList<string> Aliases,
     string SelectedPrimaryKeyAlias,
+    string TechnicalReasonColumnName,
     long TotalRows,
+    long ValidRows,
     long EmptyPrimaryKeyRows,
     long DuplicateGroups,
     long DuplicateRows,
-    bool IsValid);
+    bool IsValid,
+    bool HasRejections,
+    bool CanPromote);
 
 public static class SergioCellTextFormatter
 {
@@ -102,11 +106,12 @@ public sealed class SergioStagingAnalyzer
             using var cursor = cursorFactory.Open(request.WorkbookPath);
             ValidateHeaders(cursor.Headers, request.AcceptedHeaders);
             var aliases = request.AcceptedHeaders.Columns.Select(column => column.ProposedAlias).ToArray();
+            var reasonColumn = CreateTechnicalReasonColumnName(aliases);
             candidate = CreateCandidateName();
             lock (sync) ownedCandidates.Add(candidate);
             using var connection = Open(databasePath);
             using var transaction = connection.BeginTransaction();
-            Execute(connection, transaction, $"CREATE TABLE {Quote(candidate)} ({string.Join(", ", aliases.Select(alias => $"{Quote(alias)} VARCHAR"))})");
+            Execute(connection, transaction, $"CREATE TABLE {Quote(candidate)} ({string.Join(", ", aliases.Select(alias => $"{Quote(alias)} VARCHAR"))}, {Quote(reasonColumn)} VARCHAR)");
 
             using (var appender = connection.CreateAppender(candidate))
             {
@@ -122,26 +127,20 @@ public sealed class SergioStagingAnalyzer
                     appender.AppendRow(row =>
                     {
                         foreach (var value in values)
-                            row.AppendValue(value as string);
+                        {
+                            if (value is null) row.AppendNullValue(); else row.AppendValue((string)value);
+                        }
+                        row.AppendNullValue();
                     });
                 }
                 appender.Close();
             }
 
-            var metrics = ReadMetrics(connection, transaction, candidate, request.SelectedPrimaryKeyAlias);
-            if (!metrics.IsValid)
-            {
-                Execute(connection, transaction, $"DROP TABLE {Quote(candidate)}");
-                transaction.Commit();
-                lock (sync) ownedCandidates.Remove(candidate);
-                candidate = null;
-            }
-            else
-            {
-                transaction.Commit();
-            }
+            ClassifyRows(connection, transaction, candidate, request.SelectedPrimaryKeyAlias, reasonColumn);
+            var metrics = ReadMetrics(connection, transaction, candidate, request.SelectedPrimaryKeyAlias, reasonColumn);
+            transaction.Commit();
 
-            return metrics with { CandidateTableName = candidate ?? string.Empty, Aliases = aliases, SelectedPrimaryKeyAlias = request.SelectedPrimaryKeyAlias };
+            return metrics with { CandidateTableName = candidate, Aliases = aliases, SelectedPrimaryKeyAlias = request.SelectedPrimaryKeyAlias, TechnicalReasonColumnName = reasonColumn };
         }
         catch (OperationCanceledException exception)
         {
@@ -244,19 +243,49 @@ public sealed class SergioStagingAnalyzer
         return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture) != 0;
     }
 
-    private static SergioStagingResult ReadMetrics(DuckDBConnection connection, DuckDBTransaction transaction, string table, string key)
+    private static string CreateTechnicalReasonColumnName(IReadOnlyCollection<string> aliases)
     {
-        var quotedKey = Quote(key);
+        const string baseName = "__pp_motivo_rechazo";
+        var suffix = 0;
+        string candidate;
+        do candidate = suffix++ == 0 ? baseName : $"{baseName}_{suffix - 1}";
+        while (aliases.Contains(candidate, StringComparer.Ordinal));
+        return candidate;
+    }
+
+    private static void ClassifyRows(DuckDBConnection connection, DuckDBTransaction transaction, string table, string key, string reason)
+    {
+        var qKey = Quote(key);
+        var qReason = Quote(reason);
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = $"SELECT COUNT(*) AS total, SUM(CASE WHEN {quotedKey} IS NULL OR TRIM({quotedKey}) = '' THEN 1 ELSE 0 END) AS empty_rows, COUNT(*) FILTER (WHERE {quotedKey} IS NOT NULL AND TRIM({quotedKey}) <> '' AND TRIM({quotedKey}) IN (SELECT TRIM({quotedKey}) FROM {Quote(table)} WHERE {quotedKey} IS NOT NULL AND TRIM({quotedKey}) <> '' GROUP BY TRIM({quotedKey}) HAVING COUNT(*) > 1)) AS duplicate_rows, (SELECT COUNT(*) FROM (SELECT TRIM({quotedKey}) FROM {Quote(table)} WHERE {quotedKey} IS NOT NULL AND TRIM({quotedKey}) <> '' GROUP BY TRIM({quotedKey}) HAVING COUNT(*) > 1)) AS duplicate_groups FROM {Quote(table)}";
+        command.CommandText = $"UPDATE {Quote(table)} SET {qReason} = ? WHERE {qKey} IS NULL OR TRIM({qKey}) = ''";
+        command.Parameters.Add(new DuckDBParameter { Value = "CLAVE_VACIA" });
+        command.ExecuteNonQuery();
+        command.Parameters.Clear();
+        command.CommandText = $"UPDATE {Quote(table)} SET {qReason} = ? WHERE {qReason} IS NULL AND {qKey} IS NOT NULL AND TRIM({qKey}) <> '' AND TRIM({qKey}) IN (SELECT TRIM({qKey}) FROM {Quote(table)} WHERE {qKey} IS NOT NULL AND TRIM({qKey}) <> '' GROUP BY TRIM({qKey}) HAVING COUNT(*) > 1)";
+        command.Parameters.Add(new DuckDBParameter { Value = "CLAVE_DUPLICADA" });
+        command.ExecuteNonQuery();
+    }
+
+    private static SergioStagingResult ReadMetrics(DuckDBConnection connection, DuckDBTransaction transaction, string table, string key, string reason)
+    {
+        var quotedKey = Quote(key);
+        var quotedReason = Quote(reason);
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $"SELECT COUNT(*), COUNT(*) FILTER (WHERE {quotedReason} IS NULL), COUNT(*) FILTER (WHERE {quotedReason} = ?), COUNT(*) FILTER (WHERE {quotedReason} = ?), (SELECT COUNT(*) FROM (SELECT TRIM({quotedKey}) FROM {Quote(table)} WHERE {quotedKey} IS NOT NULL AND TRIM({quotedKey}) <> '' GROUP BY TRIM({quotedKey}) HAVING COUNT(*) > 1)) FROM {Quote(table)}";
+        command.Parameters.Add(new DuckDBParameter { Value = "CLAVE_VACIA" });
+        command.Parameters.Add(new DuckDBParameter { Value = "CLAVE_DUPLICADA" });
         using var reader = command.ExecuteReader();
         reader.Read();
         var total = reader.GetInt64(0);
-        var empty = reader.IsDBNull(1) ? 0 : reader.GetInt64(1);
-        var duplicateRows = reader.IsDBNull(2) ? 0 : reader.GetInt64(2);
-        var groups = reader.IsDBNull(3) ? 0 : reader.GetInt64(3);
-        return new SergioStagingResult(table, [], key, total, empty, groups, duplicateRows, empty == 0 && groups == 0);
+        var valid = reader.GetInt64(1);
+        var empty = reader.GetInt64(2);
+        var duplicateRows = reader.GetInt64(3);
+        var groups = reader.GetInt64(4);
+        var isValid = total > 0 && empty == 0 && duplicateRows == 0;
+        return new SergioStagingResult(table, [], key, string.Empty, total, valid, empty, groups, duplicateRows, isValid, total != valid, isValid);
     }
 
     private static void ValidateRequest(SergioStagingRequest request)
