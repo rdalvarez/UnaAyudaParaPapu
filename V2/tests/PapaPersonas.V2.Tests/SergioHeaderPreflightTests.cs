@@ -70,4 +70,43 @@ public sealed class SergioHeaderPreflightTests
         Assert.Equal("CUIL", SergioPrimaryKeySelection.DefaultAlias(result.Columns));
         Assert.Null(SergioPrimaryKeySelection.DefaultAlias(SergioHeaderPreflight.Analyze(["CUIL (1)"]).Columns));
     }
+
+    [Fact]
+    public void PrimaryKeyOptionsPrioritizeAvailableExactAliasesAndPreserveRemainingOrder()
+    {
+        var result = SergioHeaderPreflight.Analyze(["Email", "DNI", "CUIL (1)", "CUIT", "CUIL", "Nombre"]);
+
+        Assert.Equal(["CUIL", "CUIT", "DNI", "Email", "CUIL (1)", "Nombre"], SergioPrimaryKeySelection.Options(result.Columns));
+    }
+
+    [Fact]
+    public void PrimaryKeyOptionsOmitUnavailablePreferredAliases()
+    {
+        var result = SergioHeaderPreflight.Analyze(["Nombre", "DNI", "Email"]);
+
+        Assert.Equal(["DNI", "Nombre", "Email"], SergioPrimaryKeySelection.Options(result.Columns));
+    }
+
+    [Fact]
+    public void PrimaryKeyOptionsAreCaseSensitiveAndDoNotDuplicateAliases()
+    {
+        var columns = new SergioHeaderColumn[]
+        {
+            new(0, "cuil", "cuil", SergioHeaderIssueKind.None),
+            new(1, "CUIL", "CUIL", SergioHeaderIssueKind.None),
+            new(2, "Email", "Email", SergioHeaderIssueKind.None),
+            new(3, "Email", "Email", SergioHeaderIssueKind.None)
+        };
+
+        Assert.Equal(["CUIL", "cuil", "Email"], SergioPrimaryKeySelection.Options(columns));
+        Assert.Null(SergioPrimaryKeySelection.DefaultAlias([columns[0], columns[2]]));
+    }
+
+    [Fact]
+    public void PrimaryKeyOptionsPreserveAllDistinctAliasesIncludingSuffixedAliases()
+    {
+        var result = SergioHeaderPreflight.Analyze(["CUIL (1)", "CUIL", "CUIL (1)", "DNI"]);
+
+        Assert.Equal(["CUIL", "DNI", "CUIL (1)", "CUIL (1) (1)"], SergioPrimaryKeySelection.Options(result.Columns));
+    }
 }

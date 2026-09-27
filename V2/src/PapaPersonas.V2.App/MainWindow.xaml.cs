@@ -156,7 +156,7 @@ public partial class MainWindow : Window
         _acceptedSergioHeaders = result;
         SergioFileTextBox.Text = path;
         SergioHeadersListBox.ItemsSource = result.Columns.Select(column => $"{column.Position + 1}. {DisplayHeader(column.RawName)} → {column.ProposedAlias}").ToArray();
-        SergioPrimaryKeyComboBox.ItemsSource = result.Columns.Select(column => column.ProposedAlias).ToArray();
+        SergioPrimaryKeyComboBox.ItemsSource = SergioPrimaryKeySelection.Options(result.Columns);
         SergioPrimaryKeyComboBox.SelectedItem = SergioPrimaryKeySelection.DefaultAlias(result.Columns);
         SergioPrimaryKeyComboBox.IsEnabled = true;
     }

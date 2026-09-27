@@ -85,6 +85,32 @@ public static class SergioHeaderPreflight
 
 public static class SergioPrimaryKeySelection
 {
+    private static readonly string[] PreferredAliases = ["CUIL", "CUIT", "DNI"];
+
+    public static IReadOnlyList<string> Options(IEnumerable<SergioHeaderColumn> columns)
+    {
+        ArgumentNullException.ThrowIfNull(columns);
+
+        var aliases = columns.Select(column => column.ProposedAlias).ToArray();
+        var available = new HashSet<string>(aliases, StringComparer.Ordinal);
+        var ordered = new List<string>(aliases.Length);
+
+        foreach (var preferredAlias in PreferredAliases)
+        {
+            if (available.Contains(preferredAlias))
+                ordered.Add(preferredAlias);
+        }
+
+        var added = new HashSet<string>(ordered, StringComparer.Ordinal);
+        foreach (var alias in aliases)
+        {
+            if (added.Add(alias))
+                ordered.Add(alias);
+        }
+
+        return ordered;
+    }
+
     public static string? DefaultAlias(IEnumerable<SergioHeaderColumn> columns) =>
         columns.FirstOrDefault(column => string.Equals(column.ProposedAlias, "CUIL", StringComparison.Ordinal))?.ProposedAlias;
 }
