@@ -77,7 +77,7 @@ public partial class MainWindow : Window
             ResetCleaningPlan();
             _rawHeaders = rawHeaders;
             SetColumns(columns);
-            AddActivity($"Archivo seleccionado: {Path.GetFileName(path)}");
+            AddActivity($"Archivo seleccionado: {path}");
             AddActivity($"Carpeta de rechazados: {rejectedFolder}");
             AddActivity($"Columnas detectadas: {columns.Count}");
         }
@@ -224,7 +224,7 @@ public partial class MainWindow : Window
             foreach (var omitted in result.OmittedSteps)
                 AddActivity($"Paso omitido: {omitted.Step.VisibleDescription}. Razón: {omitted.Reason}.");
             foreach (var cycle in result.Cycles)
-                AddActivity($"Ciclo {cycle.StepNumber}: {cycle.Action} por {cycle.ColumnName}; entrada {cycle.InputRows}, rechazadas {cycle.RejectedRows}, restantes {cycle.RemainingRows}.");
+                AddActivity($"Ciclo {cycle.StepNumber}: {GetCleaningActionName(cycle.Action)} por {cycle.ColumnName}; entrada {cycle.InputRows}, rechazadas {cycle.RejectedRows}, restantes {cycle.RemainingRows}.");
             AddActivity($"Total rechazado: {result.TotalRejectedRows}. Total restante: {result.RemainingRows}.");
             AddActivity($"Salida limpia: {result.CleanOutputPath}");
             AddActivity($"Salida de rechazados: {result.RejectedOutputPath}");
@@ -249,6 +249,13 @@ public partial class MainWindow : Window
         _activityLog.Add(message);
         ActivityTextBox.Text = string.Join(Environment.NewLine, _activityLog.Entries);
     }
+
+    private static string GetCleaningActionName(CleaningAction action) => action switch
+    {
+        CleaningAction.RemoveDuplicates => "Quitar duplicados",
+        CleaningAction.RemoveEmptyValues => "Quitar valores vacíos",
+        _ => action.ToString()
+    };
 
     private void OpenRejectedFolder()
     {

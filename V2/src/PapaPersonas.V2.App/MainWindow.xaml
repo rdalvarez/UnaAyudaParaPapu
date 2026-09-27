@@ -74,7 +74,7 @@
                                     <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Valores vacíos" />
                                     <ComboBox x:Name="EmptyColumnComboBox" Grid.Row="1" Grid.Column="1" Margin="8,4" DisplayMemberPath="DisplayName" IsEnabled="False" SelectionChanged="CleaningColumnComboBox_OnSelectionChanged" AutomationProperties.Name="Columna para vacíos" />
                                     <Button x:Name="RemoveEmptyValuesButton" Grid.Row="1" Grid.Column="2" Margin="8,4" Content="Quitar valores vacíos" IsEnabled="False" Click="RemoveEmptyValuesButton_OnClick" />
-                                    <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,8,0,0" Foreground="#FF777777" Text="Las acciones agregan pasos al plan; todavía no se leen ni modifican filas." TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,8,0,0" Foreground="#FF777777" Text="Las acciones agregan pasos al plan; al generar, los pasos se ejecutan en el orden mostrado." TextWrapping="Wrap" />
                                     <Grid Grid.Row="3" Grid.ColumnSpan="3" Margin="0,12,0,0">
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" FontSize="15" FontWeight="SemiBold" Text="Plan de limpieza" />
@@ -89,7 +89,7 @@
                             <GroupBox Header="Resumen y estado del ciclo" Padding="10" Margin="0,12,0,0">
                                 <TextBlock x:Name="CycleSummaryTextBlock" Text="Sin ciclo iniciado. No se han leído ni modificado archivos." TextWrapping="Wrap" />
                             </GroupBox>
-                            <Button x:Name="GenerateOutputButton" Margin="0,12,0,0" HorizontalAlignment="Left" Width="220" Content="Generar archivo de salida" Click="GenerateOutputButton_OnClick" AutomationProperties.Name="Generar archivo de salida" />
+                            <Button x:Name="GenerateOutputButton" Margin="0,12,0,0" HorizontalAlignment="Left" Width="220" Content="Generar archivo de salida" IsEnabled="False" Click="GenerateOutputButton_OnClick" AutomationProperties.Name="Generar archivo de salida" />
                         </StackPanel>
                     </ScrollViewer>
                     <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Center" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" Background="#FFDDDDDD" />
