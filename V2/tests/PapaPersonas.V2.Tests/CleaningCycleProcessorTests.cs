@@ -6,6 +6,48 @@ namespace PapaPersonas.V2.Tests;
 public sealed class CleaningCycleProcessorTests
 {
     [Fact]
+    public void Projector_uses_original_positions_and_preserves_csv_values()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "PapaPersonasTests", Guid.NewGuid().ToString("N"));
+        var workspace = new FixedTemporaryWorkspace(root);
+        try
+        {
+            workspace.Prepare();
+            var current = workspace.GetPath("current.csv");
+            using (var writer = StreamingCsvWriter.Open(current))
+            {
+                writer.WriteRow(["", "Name", "Name", "Unicode"]);
+                writer.WriteRow(["zero", "a,b", "quoted \"value\"", "á\r\nβ"]);
+            }
+
+            var projected = new CleanOutputProjector().Project(workspace, current,
+                ["", "Name", "Name", "Unicode"], [3, 0, 2]);
+
+            using var reader = StreamingCsvReader.Open(projected);
+            Assert.True(reader.Read());
+            Assert.Equal(["", "Name", "Unicode"], reader.CurrentRow);
+            Assert.True(reader.Read());
+            Assert.Equal(["zero", "quoted \"value\"", "á\r\nβ"], reader.CurrentRow);
+            Assert.False(reader.Read());
+            Assert.Equal(0xEF, File.ReadAllBytes(projected)[0]);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    [Theory]
+    [InlineData(new[] { 0, 0 })]
+    [InlineData(new[] { -1 })]
+    [InlineData(new[] { 2 })]
+    [InlineData(new int[0])]
+    public void Projector_rejects_invalid_selection_before_processing(int[] positions)
+    {
+        Assert.Throws<ArgumentException>(() => CleanOutputProjector.ValidateAndNormalize(2, positions));
+    }
+
+    [Fact]
     public void Empty_values_reject_whitespace_and_preserve_full_rows()
     {
         using var fixture = CreateFixture(["Name", "Value"], [["a", "  "], ["b", " keep "]]);

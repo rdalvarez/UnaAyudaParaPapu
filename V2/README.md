@@ -1,6 +1,6 @@
 # PapaPersonas V2
 
-V2 now connects **Preparar archivo de Hernán** end to end: selecting an Excel workbook preserves its raw headers, exposes normalized dynamic columns, builds an ordered plan, executes it asynchronously through the verified coordinator, publishes paired CSV outputs, and reports evidence in the newest-first activity log. The completion dialog opens the original source directory. Current limits are Excel input only, no cancellation, no per-row UI, no TXT log export, no CSV/TXT source, no DuckDB, and no persistence; Sergio, Stock, and Consultas remain future tabs.
+V2 now connects **Preparar archivo de Hernán** end to end: selecting an Excel workbook preserves its raw headers, exposes normalized dynamic columns, builds an ordered plan, executes it asynchronously through the verified coordinator, publishes paired CSV outputs, and reports evidence in the newest-first activity log. The detected-column list uses position-based checkboxes, all columns start selected, and the clean CSV includes only the checked columns. The rejected CSV keeps its four technical columns plus every original column for audit. The completion dialog opens the original source directory. Current limits are Excel input only, no cancellation, no per-row UI, no TXT log export, no CSV/TXT source, no DuckDB, and no persistence; Sergio, Stock, and Consultas remain future tabs.
 
 ## Verification
 

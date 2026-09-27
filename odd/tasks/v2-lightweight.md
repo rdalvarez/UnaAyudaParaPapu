@@ -281,7 +281,17 @@ The current application contains a cumulative master-database workflow that is n
     - Runtime harness: `N/A` — this bounded formatting change has no new runtime boundary; build, tests, and structural readback are the applicable verification.
     - Rollback boundary: revert `ColumnDiscovery.cs`, `MainWindow.xaml.cs`, `TabCatalogTests.cs`, and this V2L-016 evidence only; cleaning and cleanup behavior remain outside the boundary.
     - RDD risk: `disabled/unmanaged`.
-    - Commit: pending until verification (`feat(v2): timestamp paso one activity log`).
+    - Commit: `493d6a5` (`feat(v2): timestamp paso one activity log`).
+
+- [x] **V2L-017 — Select columns for the clean CSV only**
+  - Objective: let the operator choose the clean-output columns by their original positions while preserving complete rejected-row audit evidence.
+  - Explicit scope: checkboxes affect only the clean CSV. Rejected output always keeps `PP_MOTIVO`, `PP_PASO`, `PP_COLUMNA`, `PP_VALOR`, followed by every original column, including unselected columns.
+  - Route: delegated direct because the Paso 1 UI, execution coordinator, streaming projector, and focused tests span multiple non-trivial files.
+  - Acceptance: all detected columns default checked; duplicate/empty headers remain selectable by `DetectedColumn.Position`; rules can use unselected columns; busy state disables checkboxes; generation requires at least one selected column; projection validates full-width processed CSV rows and writes selected positions in source order without materializing the file.
+  - Evidence: Release build passed with 0 warnings/errors; 41/41 tests passed; independent read-only verification passed. Structural readback confirms full-width staging/cycles, projection after cleaning, and unmodified rejected consolidation. Tests cover reordered selections, empty/duplicate headers, CSV quoting/CRLF/Unicode, invalid selections before workspace preparation, unselected rule columns, and all-selected compatibility. Test roots use `Path.GetTempPath()` only; production LocalAppData is not used.
+  - Rollback: revert the V2L-017 UI selection state, clean-output projector/coordinator wiring, focused tests, README note, and this task entry; prior full-width clean/rejected behavior is restored.
+  - RDD risk: `disabled/unmanaged`.
+  - Commit: this work-unit commit (`feat(v2): select clean output columns`).
 
 ## Confirmed Future Cleaning Semantics
 

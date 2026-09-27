@@ -61,7 +61,13 @@
                             </StackPanel>
 
                             <GroupBox Header="Columnas detectadas" Padding="10" Margin="0,12,0,0">
-                                <ListBox x:Name="DetectedColumnsListBox" Height="72" DisplayMemberPath="DisplayName" AutomationProperties.Name="Columnas detectadas" />
+                                <ListBox x:Name="DetectedColumnsListBox" Height="110" AutomationProperties.Name="Columnas detectadas">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox Content="{Binding Column.DisplayName}" IsChecked="{Binding IsSelected, Mode=TwoWay}" Checked="OutputColumnCheckBox_OnChanged" Unchecked="OutputColumnCheckBox_OnChanged" />
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
                             </GroupBox>
 
                             <GroupBox Header="Limpieza" Padding="10" Margin="0,12,0,0">

@@ -4,7 +4,8 @@ public sealed record CleaningExecutionRequest(
     string InputWorkbookPath,
     string RejectedFolderPath,
     IReadOnlyList<string?> PlanningRawHeaders,
-    IReadOnlyList<CleaningPlanStep> VisibleSteps);
+    IReadOnlyList<CleaningPlanStep> VisibleSteps,
+    IReadOnlyList<int>? SelectedCleanColumnPositions = null);
 
 public sealed record CleaningExecutionResult(
     string CleanOutputPath,
@@ -103,6 +104,7 @@ public sealed class CleaningExecutionCoordinator
     private readonly WorkbookStager stager;
     private readonly IWorkbookRowCursorFactory cursorFactory;
     private readonly CleaningCycleProcessor processor;
+    private readonly CleanOutputProjector projector;
     private readonly ICleaningOutputPublisher publisher;
     private readonly Func<DateTime> clock;
 
@@ -111,6 +113,7 @@ public sealed class CleaningExecutionCoordinator
         WorkbookStager? stager = null,
         IWorkbookRowCursorFactory? cursorFactory = null,
         CleaningCycleProcessor? processor = null,
+        CleanOutputProjector? projector = null,
         ICleaningOutputPublisher? publisher = null,
         Func<DateTime>? clock = null)
     {
@@ -118,6 +121,7 @@ public sealed class CleaningExecutionCoordinator
         this.stager = stager ?? new WorkbookStager();
         this.cursorFactory = cursorFactory ?? new ExcelDataReaderWorkbookRowCursorFactory();
         this.processor = processor ?? new CleaningCycleProcessor();
+        this.projector = projector ?? new CleanOutputProjector();
         this.publisher = publisher ?? new SafeCleaningOutputPublisher();
         this.clock = clock ?? (() => DateTime.Now);
     }
@@ -127,6 +131,11 @@ public sealed class CleaningExecutionCoordinator
         ArgumentNullException.ThrowIfNull(request);
         if (request.VisibleSteps.Count == 0)
             throw new ArgumentException("The visible cleaning plan must contain at least one step.", nameof(request));
+        var selectedPositions = request.SelectedCleanColumnPositions is null
+            ? Enumerable.Range(0, request.PlanningRawHeaders.Count).ToArray()
+            : CleanOutputProjector.ValidateAndNormalize(request.PlanningRawHeaders.Count, request.SelectedCleanColumnPositions);
+        if (request.PlanningRawHeaders.Count == 0)
+            throw new ArgumentException("Planning headers must contain at least one column.", nameof(request));
         var extension = Path.GetExtension(request.InputWorkbookPath);
         if (!string.Equals(extension, ".xlsx", StringComparison.OrdinalIgnoreCase) &&
             !string.Equals(extension, ".xls", StringComparison.OrdinalIgnoreCase))
@@ -142,8 +151,10 @@ public sealed class CleaningExecutionCoordinator
                 request.VisibleSteps, workspace, cursorFactory);
             var processed = processor.Process(workspace, request.PlanningRawHeaders,
                 staged.NormalizedExecutablePlan, staged.StagedPath);
+            var projectedCleanPath = projector.Project(workspace, processed.CurrentPath,
+                request.PlanningRawHeaders, selectedPositions);
             var published = publisher.Publish(request.InputWorkbookPath, request.RejectedFolderPath,
-                processed.CurrentPath, processed.RejectedPath, clock());
+                projectedCleanPath, processed.RejectedPath, clock());
 
             result = new CleaningExecutionResult(
                 published.CleanPath,

@@ -46,6 +46,35 @@ public sealed class CleaningExecutionCoordinatorTests
     }
 
     [Fact]
+    public void Unselected_column_can_drive_cleaning_and_rejected_output_remains_full_width()
+    {
+        var root = CreateRoot();
+        var input = Path.Combine(root, "people.xlsx");
+        var rejected = Path.Combine(root, "rech");
+        try
+        {
+            using (var workbook = new XLWorkbook())
+            {
+                var sheet = workbook.Worksheets.Add("People");
+                sheet.Cell(1, 1).Value = "Keep"; sheet.Cell(1, 2).Value = "Rule";
+                sheet.Cell(2, 1).Value = "first"; sheet.Cell(2, 2).Value = "";
+                sheet.Cell(3, 1).Value = "second"; sheet.Cell(3, 2).Value = "ok";
+                workbook.SaveAs(input);
+            }
+
+            var result = new CleaningExecutionCoordinator(
+                () => new FixedTemporaryWorkspace(Path.Combine(root, "workspace")))
+                .Execute(new CleaningExecutionRequest(input, rejected, ["Keep", "Rule"],
+                    [new(CleaningAction.RemoveEmptyValues, 1, "Rule", 1)], [0]));
+
+            Assert.Equal(["Keep", "second"], File.ReadAllLines(result.CleanOutputPath));
+            Assert.Equal("PP_MOTIVO,PP_PASO,PP_COLUMNA,PP_VALOR,Keep,Rule", File.ReadLines(result.RejectedOutputPath).First());
+            Assert.Contains(",first,\"\"", File.ReadAllText(result.RejectedOutputPath));
+        }
+        finally { DeleteRoot(root); }
+    }
+
+    [Fact]
     public void Existing_pair_uses_shared_suffix_and_preserves_old_content()
     {
         var root = CreateRoot();

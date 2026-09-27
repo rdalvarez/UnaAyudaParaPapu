@@ -8,12 +8,19 @@ namespace PapaPersonas.V2.App;
 
 public partial class MainWindow : Window
 {
+    private sealed class OutputColumnSelection(DetectedColumn column)
+    {
+        public DetectedColumn Column { get; } = column;
+        public bool IsSelected { get; set; } = true;
+    }
+
     private readonly IHeaderReader _headerReader = new ExcelDataReaderHeaderReader();
     private readonly ActivityLog _activityLog = new();
     private readonly CleaningPlan _cleaningPlan = new();
     private readonly CleaningExecutionCoordinator _executionCoordinator = new();
     private string? _rejectedFolderPath;
     private IReadOnlyList<string?> _rawHeaders = [];
+    private IReadOnlyList<OutputColumnSelection> _outputColumns = [];
     private bool _isBusy;
 
     public MainWindow()
@@ -120,13 +127,16 @@ public partial class MainWindow : Window
 
     private void SetColumns(IReadOnlyList<DetectedColumn> columns)
     {
-        DetectedColumnsListBox.ItemsSource = columns;
+        _outputColumns = columns.Select(column => new OutputColumnSelection(column)).ToArray();
+        DetectedColumnsListBox.ItemsSource = _outputColumns;
         DuplicateColumnComboBox.ItemsSource = columns;
         EmptyColumnComboBox.ItemsSource = columns;
         DuplicateColumnComboBox.IsEnabled = columns.Count > 0;
         EmptyColumnComboBox.IsEnabled = columns.Count > 0;
         UpdateCleaningControls();
     }
+
+    private void OutputColumnCheckBox_OnChanged(object sender, RoutedEventArgs e) => UpdateCleaningControls();
 
     private void SetBusy(bool isBusy, string? status = null)
     {
@@ -137,6 +147,7 @@ public partial class MainWindow : Window
         BrowseFolderButton.IsEnabled = !isBusy;
         RejectedFolderLabel.IsEnabled = !isBusy;
         RejectedFolderTextBox.IsEnabled = !isBusy;
+        DetectedColumnsListBox.IsEnabled = !isBusy;
         UpdateCleaningControls();
     }
 
@@ -201,7 +212,8 @@ public partial class MainWindow : Window
         ClearCleaningPlanButton.IsEnabled = !isBusy && _cleaningPlan.Steps.Count > 0;
         GenerateOutputButton.IsEnabled = !isBusy &&
             !string.IsNullOrWhiteSpace(InputFileTextBox.Text) && File.Exists(InputFileTextBox.Text) &&
-            !string.IsNullOrWhiteSpace(_rejectedFolderPath) && _rawHeaders.Count > 0 && _cleaningPlan.Steps.Count > 0;
+            !string.IsNullOrWhiteSpace(_rejectedFolderPath) && _rawHeaders.Count > 0 && _cleaningPlan.Steps.Count > 0 &&
+            _outputColumns.Any(column => column.IsSelected);
     }
 
     private async void GenerateOutputButton_OnClick(object sender, RoutedEventArgs e)
@@ -214,13 +226,16 @@ public partial class MainWindow : Window
         var rejectedFolderPath = _rejectedFolderPath;
         var rawHeaders = _rawHeaders.ToArray();
         var visibleSteps = _cleaningPlan.Steps.ToArray();
+        var selectedPositions = _outputColumns.Where(column => column.IsSelected)
+            .Select(column => column.Column.Position).OrderBy(position => position).ToArray();
+        AddActivity($"Columnas incluidas en la salida limpia: {selectedPositions.Length} de {_rawHeaders.Count}.");
         AddActivity($"Validando plan: {visibleSteps.Length} pasos recibidos.");
         SetBusy(true, "Procesando archivo...");
         CycleSummaryTextBlock.Text = "Procesando archivo...";
         try
         {
             var result = await Task.Run(() => _executionCoordinator.Execute(
-                new CleaningExecutionRequest(inputPath, rejectedFolderPath, rawHeaders, visibleSteps)));
+                new CleaningExecutionRequest(inputPath, rejectedFolderPath, rawHeaders, visibleSteps, selectedPositions)));
             foreach (var omitted in result.OmittedSteps)
                 AddActivity($"Paso omitido: {omitted.Step.VisibleDescription}. Razón: {omitted.Reason}.");
             foreach (var cycle in result.Cycles)
