@@ -300,16 +300,16 @@ The current application contains a cumulative master-database workflow that is n
   - Evidence: `dotnet build V2/PapaPersonas.sln -c Release --no-restore` passed with 0 warnings and 0 errors; `dotnet test V2/PapaPersonas.sln -c Release --no-build` passed with 41 tests, 0 failures, and 0 skips; `git diff --check` passed. Structural readback confirms one global `ActivityTextBox`, one global `OperationProgressPanel`/`ProgressBar`, no progress `Visibility` toggling, idle reset in `SetBusy(false)`, a global splitter with `MinHeight="120"`, and four tabs with only Preparar enabled through the existing catalog. Bounded launch/close smoke passed; visual acceptance is not claimed.
   - Rollback: revert the global MainWindow layout/progress changes, README note, and this task entry; cleaning behavior, outputs, and tab availability remain unchanged.
   - RDD risk: `disabled/unmanaged`.
-   - Commit: pending until commit (`feat(v2): share global progress and activity`).
+  - Commit: `bcdb88b` (`feat(v2): share global progress and activity`).
 
 - [x] **V2L-019 — Remember clean column selections**
   - Objective: remember the operator's clean-output column choices without persisting workbook rows or changing the existing cleaning pipeline.
   - Route: delegated direct.
   - Acceptance: one reusable `%LOCALAPPDATA%\PapaPersonas\V2\settings.json` document uses exact Spanish JSON keys; visual names are ordinal and deterministic, settings load after header normalization, unknown names are ignored, and settings save only after successful generation before the completion dialog. Missing settings default to all selected; corrupt JSON is replaced with empty defaults and logged; permission/IO failures remain visible errors. Generate remains available only when at least one column is selected.
-   - Evidence: initial implementation was blocked because `Save()` rebuilt the root document with only `configuracionPaso1`, and `MainWindow` created a new document before saving, which would delete future sections. The bounded correction adds root and Paso 1 `JsonExtensionData`, retains the loaded document in `MainWindow`, and normalizes only the known selection list. Regression coverage starts from JSON containing `configuracionPaso2` and a future Paso 1 property, updates Paso 1, and confirms both unknown properties survive with their original values. Required Release build, complete tests, `git diff --check`, and structural readback passed after the correction.
+  - Evidence: initial implementation was blocked because `Save()` rebuilt the root document with only `configuracionPaso1`, and `MainWindow` created a new document before saving, which would delete future sections. The bounded correction adds root and Paso 1 `JsonExtensionData`, retains the loaded document in `MainWindow`, and normalizes only the known selection list. Regression coverage starts from JSON containing `configuracionPaso2` and a future Paso 1 property, updates Paso 1, and confirms both unknown properties survive with their original values. Required Release build, 49/49 tests, `git diff --check`, structural readback, and independent revalidation passed after the correction. The user manually confirmed that deselected columns persist correctly and approved the behavior.
   - Rollback: revert `ColumnDiscovery.cs`, `ColumnSelectionSettings.cs`, `MainWindow.xaml.cs`, focused settings tests, README persistence note, and this task entry; prior non-persistent column selection behavior is restored.
   - RDD risk: `disabled/unmanaged`.
-   - Commit: `fix(v2): preserve future settings sections` (correction commit).
+  - Commits: `6f40641` (`feat(v2): remember clean column selections`) and `ac1016a` (`fix(v2): preserve future settings sections`).
 
 ## Confirmed Future Cleaning Semantics
 
@@ -322,4 +322,4 @@ The current application contains a cumulative master-database workflow that is n
 
 ## Progress and Next Step
 
-`V2L-001` through `V2L-008`, V2L-010 through V2L-018 are complete and the single-pass speed improvement is manually accepted. The next step is a manual smoke with a representative workbook, followed only by explicitly authorized fixes. TXT export and CSV/TXT input remain future work.
+`V2L-001` through `V2L-008` and V2L-010 through V2L-019 are complete. Header performance, the cleaning workflow, selected clean-output columns, and persistent deselection memory are manually accepted. The current authorized V2 scope is complete; continue only with explicitly authorized follow-up work. TXT export and CSV/TXT input remain future work.
