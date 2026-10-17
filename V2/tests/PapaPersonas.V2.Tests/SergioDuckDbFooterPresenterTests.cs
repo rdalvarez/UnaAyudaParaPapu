@@ -102,6 +102,22 @@ public sealed class SergioDuckDbFooterPresenterTests
     }
 
     [Fact]
+    public void ResetFailurePresentationDistinguishesPreservedDeletedAndMissingDatabase()
+    {
+        var preserved = SergioDuckDbResetFailurePresenter.Present(SergioDuckDbResetFailureKind.PreviousDatabasePreserved);
+        var deleted = SergioDuckDbResetFailurePresenter.Present(SergioDuckDbResetFailureKind.PreviousDataIrreversiblyDeleted);
+        var missing = SergioDuckDbResetFailurePresenter.Present(SergioDuckDbResetFailureKind.NoPreviousDatabase);
+
+        Assert.Contains("se conservó", preserved.AlertText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("no se pueden recuperar", preserved.AlertText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("no se pueden recuperar", deleted.AlertText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("No había una base anterior", missing.AlertText, StringComparison.Ordinal);
+        Assert.Contains("No se eliminó ningún dato previo", missing.AlertText, StringComparison.Ordinal);
+        Assert.DoesNotContain("se conservó", missing.AlertText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("La base anterior se eliminó", missing.AlertText, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ResetIsDisabledWhenStatusRefreshIsBusy()
     {
         var status = new SergioDuckDbLifecycleStatus(

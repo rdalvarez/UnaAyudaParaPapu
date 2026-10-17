@@ -46,12 +46,20 @@ public partial class MainWindow : Window
         _sergioRejectedExporter = new SergioRejectedExporter(_sergioAnalyzer);
         _duckDbLifecycle = new SergioDuckDbLifecycleService(_sergioAnalyzer);
         ApplyTabCatalog();
+        StockProcess.Attach(new StockSnapshotService(_sergioAnalyzer, new StockCatalogStore(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PapaPersonas", "V2"))), message => AddActivity("Stock", message), () => _isBusy || _isDuckDbStatusBusy, (isBusy, status) => SetBusy(isBusy, status));
         ApplyDuckDbPresentation(SergioDuckDbFooterPresenter.Initializing(_duckDbLifecycle.DatabasePath, _isBusy, _isDuckDbStatusBusy));
         Loaded += MainWindow_OnLoaded;
         RejectedFolderTextBox.Cursor = System.Windows.Input.Cursors.Hand;
         RejectedFolderTextBox.MouseLeftButtonUp += (_, _) => OpenRejectedFolder();
-        Closing += (_, _) =>
+        Closing += (_, args) =>
         {
+            if (_isBusy || _isDuckDbStatusBusy)
+            {
+                args.Cancel = true;
+                AddActivity("Aplicación", "Hay una operación en curso. Espere a que termine antes de cerrar la aplicación.");
+                return;
+            }
+
             try { _sergioAnalyzer.CleanupAll(); }
             catch (Exception exception) { AddActivity("Paso 2", $"Advertencia: no se pudo limpiar candidato Sergio al cerrar: {exception.Message}"); }
         };
@@ -262,6 +270,7 @@ public partial class MainWindow : Window
         DetectedColumnsListBox.IsEnabled = !isBusy;
         UpdateDuckDbResetAvailability();
         UpdateSergioControls();
+        StockProcess.ApplyBusy();
         UpdateCleaningControls();
     }
 
@@ -270,6 +279,7 @@ public partial class MainWindow : Window
         try
         {
             await RefreshDuckDbStatusAsync(initializeBeforeInspect: true);
+            await StockProcess.RefreshAsync();
         }
         catch
         {
@@ -348,8 +358,8 @@ public partial class MainWindow : Window
         if (_isBusy || _isDuckDbStatusBusy) return;
         var confirmation = System.Windows.MessageBox.Show(
             this,
-            "Esta acción moverá la base DuckDB actual a un backup fechado y creará una base nueva sin carga oficial de Sergio.\n\n¿Desea continuar?",
-            "Confirmar reinicio de base",
+            "Esta acción eliminará de forma permanente la base DuckDB actual y todos sus datos. No se creará un backup y no se podrá recuperar la información.\n\n¿Desea continuar?",
+            "Confirmar pérdida permanente",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning,
             MessageBoxResult.No);
@@ -359,25 +369,29 @@ public partial class MainWindow : Window
         _isDuckDbStatusBusy = true;
         UpdateDuckDbResetAvailability();
         DuckDbStatusHeadlineTextBlock.Text = "Base local: reiniciando DuckDB...";
-        DuckDbStatusDetailTextBlock.Text = "Se está creando una base nueva y preservando la anterior en backup.";
+        DuckDbStatusDetailTextBlock.Text = "Se está eliminando la base actual sin backup y creando una base nueva.";
 
         try
         {
             var result = await Task.Run(() => _duckDbLifecycle.Reset(confirmedByCaller: true));
-            AddActivity("Paso 2", result.BackupPath is null
-                ? "Base local reiniciada. No había base previa para respaldar."
-                : $"Base local reiniciada. Backup: {Path.GetFileName(result.BackupPath)}.");
+            AddActivity("Paso 2", result.PreviousDatabaseDeleted
+                ? "Base local reiniciada. La base anterior se eliminó de forma permanente y no hay backup."
+                : "Base local reiniciada. No había una base anterior para eliminar.");
             await RefreshDuckDbStatusAsync(initializeBeforeInspect: false);
+            await StockProcess.RefreshAsync();
         }
-        catch
+        catch (Exception exception)
         {
-            AddActivity("Paso 2", "No se pudo reiniciar la base local de DuckDB.");
+            var failure = SergioDuckDbResetFailurePresenter.Present(
+                exception is SergioDuckDbResetException resetException ? resetException.Kind : null);
+            AddActivity("Paso 2", failure.ActivityText);
             System.Windows.MessageBox.Show(this,
-                "No se pudo reiniciar la base local. Verifique permisos de archivo, espacio en disco y que no haya procesos usando DuckDB.",
+                failure.AlertText,
                 "No se pudo reiniciar la base",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
             await RefreshDuckDbStatusAsync(initializeBeforeInspect: false);
+            await StockProcess.RefreshAsync();
         }
     }
 
@@ -457,6 +471,7 @@ public partial class MainWindow : Window
         {
             SetBusy(false);
             await RefreshDuckDbStatusAsync(initializeBeforeInspect: false);
+            await StockProcess.RefreshAsync();
         }
     }
 

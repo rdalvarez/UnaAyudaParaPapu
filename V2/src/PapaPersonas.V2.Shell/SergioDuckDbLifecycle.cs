@@ -23,25 +23,64 @@ public sealed record SergioDuckDbLifecycleStatus(
     bool HasTransientSergioTablesWarning = false,
     string? Warning = null);
 
+public enum SergioDuckDbResetFailureKind
+{
+    PreviousDatabasePreserved,
+    PreviousDataIrreversiblyDeleted,
+    NoPreviousDatabase
+}
+
+public sealed class SergioDuckDbResetException : IOException
+{
+    public SergioDuckDbResetException(SergioDuckDbResetFailureKind kind, string message, Exception innerException)
+        : base(message, innerException)
+    {
+        Kind = kind;
+    }
+
+    public SergioDuckDbResetFailureKind Kind { get; }
+}
+
+public sealed record SergioDuckDbResetFailurePresentation(string ActivityText, string AlertText);
+
+public static class SergioDuckDbResetFailurePresenter
+{
+    public static SergioDuckDbResetFailurePresentation Present(SergioDuckDbResetFailureKind? kind) => kind switch
+    {
+        SergioDuckDbResetFailureKind.PreviousDataIrreversiblyDeleted => new(
+            "La base anterior se eliminó, pero no se pudo crear la base nueva. No hay backup.",
+            "La base anterior se eliminó de forma permanente, pero no se pudo crear la base nueva. No existe un backup y los datos eliminados no se pueden recuperar."),
+        SergioDuckDbResetFailureKind.NoPreviousDatabase => new(
+            "No había una base anterior y no se pudo crear la base nueva. No se eliminó ningún dato previo.",
+            "No había una base anterior, pero no se pudo crear la base nueva. No se eliminó ningún dato previo."),
+        SergioDuckDbResetFailureKind.PreviousDatabasePreserved => new(
+            "No se pudo reiniciar la base local. La base anterior no se eliminó.",
+            "No se pudo eliminar la base local. La base anterior se conservó. Verifique permisos de archivo y que no haya procesos usando DuckDB."),
+        _ => new(
+            "No se pudo reiniciar la base local. No se pudo determinar si la base anterior se conservó.",
+            "No se pudo reiniciar la base local. No se pudo determinar si la base anterior se conservó.")
+    };
+}
+
 public sealed record SergioDuckDbResetResult(
     string DatabasePath,
-    string? BackupPath,
+    bool PreviousDatabaseDeleted,
     SergioDuckDbLifecycleStatus Status);
 
 public sealed class SergioDuckDbLifecycleService
 {
     private readonly SergioStagingAnalyzer analyzer;
-    private readonly Func<DateTime> clock;
     private readonly Action? beforeFreshInitializationForReset;
+    private readonly Action<string>? beforeDeleteForReset;
 
     public SergioDuckDbLifecycleService(
         SergioStagingAnalyzer analyzer,
-        Func<DateTime>? clock = null,
-        Action? beforeFreshInitializationForReset = null)
+        Action? beforeFreshInitializationForReset = null,
+        Action<string>? beforeDeleteForReset = null)
     {
         this.analyzer = analyzer ?? throw new ArgumentNullException(nameof(analyzer));
-        this.clock = clock ?? (() => DateTime.UtcNow);
         this.beforeFreshInitializationForReset = beforeFreshInitializationForReset;
+        this.beforeDeleteForReset = beforeDeleteForReset;
     }
 
     public string DatabasePath => analyzer.DatabasePath;
@@ -67,11 +106,25 @@ public sealed class SergioDuckDbLifecycleService
         var databasePath = DatabasePath;
         EnsureDirectory(databasePath);
 
-        string? backupPath = null;
-        if (File.Exists(databasePath))
+        var hadPreviousDatabase = File.Exists(databasePath) || File.Exists(WalPath(databasePath));
+        try
         {
-            backupPath = AllocateBackupPath(databasePath, clock());
-            File.Move(databasePath, backupPath, overwrite: false);
+            DeleteConfiguredDatabase(databasePath);
+        }
+        catch (Exception deleteException)
+        {
+            if (File.Exists(databasePath) || !hadPreviousDatabase)
+            {
+                throw new SergioDuckDbResetException(
+                    SergioDuckDbResetFailureKind.PreviousDatabasePreserved,
+                    "No se pudo eliminar la base local. La base anterior se conservó.",
+                    deleteException);
+            }
+
+            throw new SergioDuckDbResetException(
+                SergioDuckDbResetFailureKind.PreviousDataIrreversiblyDeleted,
+                "La base anterior se eliminó, pero no se pudo quitar un archivo acompañante. No existe un backup y los datos eliminados no se pueden recuperar.",
+                deleteException);
         }
 
         try
@@ -79,25 +132,50 @@ public sealed class SergioDuckDbLifecycleService
             beforeFreshInitializationForReset?.Invoke();
             InitializeCore(databasePath);
             var status = InspectCore(databasePath);
-            return new SergioDuckDbResetResult(databasePath, backupPath, status);
+            return new SergioDuckDbResetResult(databasePath, hadPreviousDatabase, status);
         }
         catch (Exception initializationException)
         {
-            if (backupPath is null || !File.Exists(backupPath))
-                throw new IOException("DuckDB reset failed while creating a fresh database.", initializationException);
-
-            try
+            if (!hadPreviousDatabase)
             {
-                DeleteIfExists(databasePath);
-                File.Move(backupPath, databasePath, overwrite: false);
-            }
-            catch (Exception restoreException)
-            {
-                throw new IOException("DuckDB reset failed and the previous database could not be restored automatically.",
-                    new AggregateException(initializationException, restoreException));
+                throw new SergioDuckDbResetException(
+                    SergioDuckDbResetFailureKind.NoPreviousDatabase,
+                    "No había una base anterior, pero no se pudo crear la base nueva. No se eliminó ningún dato previo.",
+                    initializationException);
             }
 
-            throw new IOException("DuckDB reset failed; the previous database was restored.", initializationException);
+            throw new SergioDuckDbResetException(
+                SergioDuckDbResetFailureKind.PreviousDataIrreversiblyDeleted,
+                "La base anterior se eliminó de forma permanente, pero no se pudo crear la base nueva. No existe un backup y los datos eliminados no se pueden recuperar.",
+                initializationException);
+        }
+    }
+
+    private void DeleteConfiguredDatabase(string databasePath)
+    {
+        beforeDeleteForReset?.Invoke(databasePath);
+        DeleteExactFile(databasePath);
+        DeleteExactFile(WalPath(databasePath));
+
+        // La creación y restauración de backups fechados quedaron deshabilitadas por pedido explícito.
+        // El reinicio confirmado elimina de forma permanente la base configurada y su archivo .wal.
+        // No se usa AllocateBackupPath ni File.Move hacia un backup.
+    }
+
+    private static string WalPath(string databasePath) => databasePath + ".wal";
+
+    private static void DeleteExactFile(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        if (!File.Exists(fullPath)) return;
+
+        try
+        {
+            File.Delete(fullPath);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            throw new IOException($"No se pudo eliminar '{Path.GetFileName(fullPath)}'.", exception);
         }
     }
 
@@ -432,25 +510,6 @@ public sealed class SergioDuckDbLifecycleService
         var directory = Path.GetDirectoryName(path)
             ?? throw new InvalidOperationException("The DuckDB path has no parent directory.");
         Directory.CreateDirectory(directory);
-    }
-
-    private static string AllocateBackupPath(string databasePath, DateTime timestamp)
-    {
-        var directory = Path.GetDirectoryName(databasePath)!;
-        var baseName = Path.GetFileNameWithoutExtension(databasePath);
-        var extension = Path.GetExtension(databasePath);
-        var stamp = timestamp.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
-        for (var suffix = 1; ; suffix++)
-        {
-            var marker = suffix == 1 ? string.Empty : $"_{suffix}";
-            var candidate = Path.Combine(directory, $"{baseName}_{stamp}{marker}.bak{extension}");
-            if (!File.Exists(candidate)) return candidate;
-        }
-    }
-
-    private static void DeleteIfExists(string path)
-    {
-        if (File.Exists(path)) File.Delete(path);
     }
 
     private static DuckDBConnection Open(string path)

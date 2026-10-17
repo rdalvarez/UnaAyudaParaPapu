@@ -1,6 +1,7 @@
 <Window x:Class="PapaPersonas.V2.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:PapaPersonas.V2.App"
         Title="PapaPersonas V2"
         Height="760" Width="1180" MinHeight="620" MinWidth="980"
         WindowStartupLocation="CenterScreen">
@@ -118,7 +119,7 @@
                     </ScrollViewer>
                 </Grid>
             </TabItem>
-            <TabItem x:Name="StockTab"><TextBlock Margin="12" Text="Disponible en una fase futura." /></TabItem>
+            <TabItem x:Name="StockTab"><local:StockProcessControl x:Name="StockProcess" /></TabItem>
             <TabItem x:Name="ConsultasTab"><TextBlock Margin="12" Text="Disponible en una fase futura." /></TabItem>
         </TabControl>
 

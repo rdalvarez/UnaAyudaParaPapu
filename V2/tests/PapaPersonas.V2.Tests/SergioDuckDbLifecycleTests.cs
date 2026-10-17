@@ -189,11 +189,25 @@ public sealed class SergioDuckDbLifecycleTests
     }
 
     [Fact]
-    public void ResetBacksUpCurrentDatabaseAndInitializesFreshOne()
+    public void UnconfirmedResetLeavesDatabaseAndWalIntact()
     {
         using var workspace = new TestWorkspace();
-        var now = new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc);
-        var lifecycle = NewLifecycle(workspace.DatabasePath, () => now);
+        var lifecycle = NewLifecycle(workspace.DatabasePath);
+        lifecycle.Initialize();
+        File.WriteAllText(workspace.DatabasePath + ".wal", "pending wal");
+        var before = File.ReadAllBytes(workspace.DatabasePath);
+
+        Assert.Throws<InvalidOperationException>(() => lifecycle.Reset(confirmedByCaller: false));
+
+        Assert.Equal(before, File.ReadAllBytes(workspace.DatabasePath));
+        Assert.Equal("pending wal", File.ReadAllText(workspace.DatabasePath + ".wal"));
+    }
+
+    [Fact]
+    public void ResetDeletesCurrentDatabaseAndWalThenInitializesFreshMetadata()
+    {
+        using var workspace = new TestWorkspace();
+        var lifecycle = NewLifecycle(workspace.DatabasePath);
         lifecycle.Initialize();
         using (var connection = Open(workspace.DatabasePath))
         {
@@ -201,42 +215,50 @@ public sealed class SergioDuckDbLifecycleTests
                 metadataSourcePath: "old.xlsx");
         }
 
+        File.WriteAllText(workspace.DatabasePath + ".wal", "pending wal");
+        var priorBackup = Path.Combine(Path.GetDirectoryName(workspace.DatabasePath)!, "prior.bak.duckdb");
+        File.WriteAllText(priorBackup, "untouched prior backup");
+
         var result = lifecycle.Reset(confirmedByCaller: true);
 
         Assert.Equal(workspace.DatabasePath, result.DatabasePath);
-        Assert.NotNull(result.BackupPath);
-        Assert.True(File.Exists(result.BackupPath!));
+        Assert.True(result.PreviousDatabaseDeleted);
+        Assert.False(File.Exists(workspace.DatabasePath + ".wal"));
+        Assert.Equal("untouched prior backup", File.ReadAllText(priorBackup));
         Assert.Equal(SergioDuckDbLifecycleKind.ReadyWithoutOfficialLoad, result.Status.Kind);
         Assert.Equal("NO_OFFICIAL_LOAD", result.Status.TechnicalReason);
+        Assert.Equal(0, result.Status.MetadataRowCount);
         using var verify = Open(workspace.DatabasePath);
         Assert.True(TableExists(verify, SergioLoadPromoter.MetadataTableName));
+        Assert.Equal(0, CountRows(verify, SergioLoadPromoter.MetadataTableName));
         Assert.False(TableExists(verify, SergioLoadPromoter.OfficialTableName));
         Assert.False(TableExists(verify, SergioLoadPromoter.LastImportTableName));
+        Assert.DoesNotContain(".bak", string.Join('|', Directory.GetFiles(Path.GetDirectoryName(workspace.DatabasePath)!).Where(path => path != priorBackup)), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void ResetBackupPathIsCollisionSafe()
+    public void ResetDoesNotTouchPriorBackupsWhenDeleteFailsBeforeRemoval()
     {
         using var workspace = new TestWorkspace();
-        var now = new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc);
-        var lifecycle = NewLifecycle(workspace.DatabasePath, () => now);
+        var lifecycle = NewLifecycle(
+            workspace.DatabasePath,
+            beforeDeleteForReset: _ => throw new IOException("database file is locked"));
         lifecycle.Initialize();
-        var stamp = now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
-        var baseName = Path.GetFileNameWithoutExtension(workspace.DatabasePath);
-        var extension = Path.GetExtension(workspace.DatabasePath);
-        var collision = Path.Combine(Path.GetDirectoryName(workspace.DatabasePath)!,
-            $"{baseName}_{stamp}.bak{extension}");
-        File.WriteAllText(collision, "existing backup");
+        var before = File.ReadAllBytes(workspace.DatabasePath);
+        var priorBackup = Path.Combine(Path.GetDirectoryName(workspace.DatabasePath)!, "prior.bak.duckdb");
+        File.WriteAllText(priorBackup, "untouched prior backup");
 
-        var result = lifecycle.Reset(confirmedByCaller: true);
+        var exception = Assert.Throws<SergioDuckDbResetException>(() => lifecycle.Reset(confirmedByCaller: true));
 
-        Assert.Equal(Path.Combine(Path.GetDirectoryName(workspace.DatabasePath)!, $"{baseName}_{stamp}_2.bak{extension}"), result.BackupPath);
-        Assert.True(File.Exists(result.BackupPath!));
-        Assert.True(File.Exists(collision));
+        Assert.Equal(SergioDuckDbResetFailureKind.PreviousDatabasePreserved, exception.Kind);
+        Assert.Contains("se conservó", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("no se pueden recuperar", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(before, File.ReadAllBytes(workspace.DatabasePath));
+        Assert.Equal("untouched prior backup", File.ReadAllText(priorBackup));
     }
 
     [Fact]
-    public void ResetRestoresPreviousDatabaseWhenFreshInitializationFails()
+    public void ResetDoesNotRestoreOrClaimRecoverabilityWhenFreshInitializationFails()
     {
         using var workspace = new TestWorkspace();
         var lifecycle = NewLifecycle(
@@ -249,21 +271,49 @@ public sealed class SergioDuckDbLifecycleTests
                 metadataSourcePath: "before-reset.xlsx");
         }
 
-        var exception = Assert.Throws<IOException>(() => lifecycle.Reset(confirmedByCaller: true));
-        Assert.Contains("previous database was restored", exception.Message, StringComparison.OrdinalIgnoreCase);
+        File.WriteAllText(workspace.DatabasePath + ".wal", "pending wal");
+        var exception = Assert.Throws<SergioDuckDbResetException>(() => lifecycle.Reset(confirmedByCaller: true));
 
-        var status = lifecycle.Inspect();
-        Assert.Equal(SergioDuckDbLifecycleKind.ReadyWithOfficialLoad, status.Kind);
-        Assert.Equal("before-reset.xlsx", status.SourceFileName);
+        Assert.Equal(SergioDuckDbResetFailureKind.PreviousDataIrreversiblyDeleted, exception.Kind);
+        Assert.Contains("no se pueden recuperar", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("se restauró", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.False(File.Exists(workspace.DatabasePath));
+        Assert.False(File.Exists(workspace.DatabasePath + ".wal"));
+        Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(workspace.DatabasePath)!, "*.bak*"));
+    }
+
+    [Fact]
+    public void ResetReportsNoPreviousDatabaseWhenFreshInitializationFailsWithoutFiles()
+    {
+        using var workspace = new TestWorkspace();
+        var lifecycle = NewLifecycle(
+            workspace.DatabasePath,
+            beforeFreshInitializationForReset: () => throw new IOException("forced reset failure"));
+
+        var exception = Assert.Throws<SergioDuckDbResetException>(() => lifecycle.Reset(confirmedByCaller: true));
+
+        Assert.Equal(SergioDuckDbResetFailureKind.NoPreviousDatabase, exception.Kind);
+        Assert.Contains("No había una base anterior", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("No se eliminó ningún dato previo", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("La base anterior se eliminó", exception.Message, StringComparison.Ordinal);
+        Assert.False(File.Exists(workspace.DatabasePath));
+        Assert.False(File.Exists(workspace.DatabasePath + ".wal"));
     }
 
     private static SergioDuckDbLifecycleService NewLifecycle(
         string databasePath,
-        Func<DateTime>? clock = null,
-        Action? beforeFreshInitializationForReset = null)
+        Action? beforeFreshInitializationForReset = null,
+        Action<string>? beforeDeleteForReset = null)
     {
         var analyzer = new SergioStagingAnalyzer(new DuckDbPathPolicy(databasePath));
-        return new SergioDuckDbLifecycleService(analyzer, clock, beforeFreshInitializationForReset);
+        return new SergioDuckDbLifecycleService(analyzer, beforeFreshInitializationForReset, beforeDeleteForReset);
+    }
+
+    private static long CountRows(DuckDBConnection connection, string tableName)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = $"SELECT COUNT(*) FROM {tableName}";
+        return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
     }
 
     private static void BuildConsistentDynamicState(

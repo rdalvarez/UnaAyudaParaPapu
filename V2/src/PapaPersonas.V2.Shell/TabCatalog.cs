@@ -8,7 +8,7 @@ public static class TabCatalog
     [
         new("Preparar archivo de Hernán", true),
         new("Ingresar archivo de Sergio", true),
-        new("Generación y consulta de stock", false),
+        new("Generación y consulta de stock", true),
         new("Consultas (opcional)", false)
     ];
 }
